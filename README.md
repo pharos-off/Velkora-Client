@@ -8,6 +8,20 @@ Un launcher **Minecraft complet et moderne** offrant une expérience utilisateur
 
 ---
 
+## ⭐ VISUALISATION
+
+=> Page d'initialisation
+<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/fff6120d-71db-4a6b-907b-01ba4fb70c06" />
+
+=> Page de paramètres
+<img width="1918" height="1029" alt="image" src="https://github.com/user-attachments/assets/e5187899-eb58-4f77-9948-eee4c4cc7a34" />
+
+=> Page principal
+<img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/105b6a53-2db8-428b-a3e3-2f38d3dd4839" />
+
+
+---
+
 ## 🚀 Installation
 
 ### Depuis les releases
@@ -111,19 +125,3 @@ Rejoignez notre communauté et aidez-nous à améliorer VelkoraMC !
 [⭐ Star sur GitHub](https://github.com/pharos-off/Velkora) • [🐛 Signaler un bug](https://github.com/pharos-off/Velkora/issues) • [💬 Discuter](https://github.com/pharos-off/Velkora/discussions)
 
 </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
