@@ -88,7 +88,7 @@ class DiscordPresence extends EventEmitter {
       try {
         // Supprimer tous les listeners
         this.client.removeAllListeners();
-        this.client.destroy()
+        this.client.destroy();
         
         // Essayer de détruire proprement
         if (this.client.transport && this.client.transport.socket) {

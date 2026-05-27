@@ -244,6 +244,12 @@ class MinecraftLauncher {
           }
         });
 
+        const onLog = progressCallback ? (level, msg) => {
+          try {
+            progressCallback({ level, message: msg });
+          } catch (_) {}
+        } : null;
+
         this.launcher.on('debug', (message) => {
           try {
             if (message && typeof message === 'string') {
@@ -470,6 +476,8 @@ class MinecraftLauncher {
       windowWidth, windowHeight, onProgress, onLog, onClose, loader
     } = options;
 
+    let downloadedVersion = null;
+
     // ✅ VÉRIFIER ET TÉLÉCHARGER SI NÉCESSAIRE
     const isInstalled = await this.checkVersionInstalled(gameDirectory, version);
 
@@ -498,6 +506,7 @@ class MinecraftLauncher {
         });
 
         if (result.success) {
+          downloadedVersion = version;
           console.log(`✅ Version ${version} downloaded successfully!`);
           if (typeof onLog === 'function') onLog('success', `✅ Version ${version} downloaded successfully!`);
           if (result.errors > 0) {
@@ -538,6 +547,9 @@ class MinecraftLauncher {
               }
             } catch (e) {}
           });
+          if (result.success) {
+            downloadedVersion = version;
+          }
           if (!result.success) {
             return {
               success: false,
@@ -617,7 +629,6 @@ class MinecraftLauncher {
     if (/^java$/i.test(resolvedJava)) {
       resolvedJava = "javaw";
     }
-    resolvedJava = resolvedJava.replace(/java\.exe$/i, 'javaw.exe');
 
     // ✅ Check Java version si possible
     const requiredMajor = this.getRequiredJavaMajor(version);
@@ -673,10 +684,15 @@ class MinecraftLauncher {
     }
 
     return new Promise((resolve, reject) => {
-      let authorization;
+      // ✅ Valider authData
+      if (!authData || typeof authData !== 'object') {
+        console.error('❌ Invalid authData:', authData);
+        return reject(new Error('authData is required for launch'));
+      }
+
+      let authorization = null;
 
       if (authData.type === 'microsoft') {
-
         // sécurité : si pas encore de clientToken, on en crée un
         if (!authData.clientToken) {
           const crypto = require('crypto');
@@ -690,6 +706,22 @@ class MinecraftLauncher {
           name: authData.username,
           user_properties: "{}"
         };
+      } else {
+        // ✅ Authentification offline ou autre
+        const crypto = require('crypto');
+        authorization = {
+          access_token: crypto.randomUUID(),
+          client_token: crypto.randomUUID(),
+          uuid: authData.uuid || crypto.randomUUID(),
+          name: authData.username || 'Player',
+          user_properties: "{}"
+        };
+      }
+
+      // ✅ Vérifier que authorization est défini
+      if (!authorization) {
+        console.error('❌ Authorization object not created');
+        return reject(new Error('Failed to create authorization'));
       }
 
       const launchOptions = {
@@ -739,7 +771,7 @@ class MinecraftLauncher {
       }
 
       launchOptions.customArgs = launchOptions.customArgs || [];
-      launchOptions.customLaunchArgs = [];
+      launchOptions.customLaunchArgs = launchOptions.customLaunchArgs || [];
 
       if (serverIP) {
         const [hostRaw, portRaw] = String(serverIP).split(':');
@@ -853,7 +885,7 @@ class MinecraftLauncher {
             try { if (typeof onClose === 'function') onClose(code); } catch (_) { }
             if (!launchResolved) {
               launchResolved = true;
-              resolve({ success: true, code: code });
+              resolve({ success: true, code: code, downloadedVersion: downloadedVersion || undefined });
             }
           } catch (err) {
             console.error('Error in launch close handler:', err && (err.stack || err.message || err));
@@ -879,7 +911,7 @@ class MinecraftLauncher {
             console.log('✅ Minecraft started successfully!');
             if (onLog) onLog('success', 'Minecraft started');
             launchResolved = true;
-            resolve({ success: true, launched: true });
+            resolve({ success: true, launched: true, downloadedVersion: downloadedVersion || undefined });
           }
         }, 1000);
 
@@ -907,41 +939,50 @@ class MinecraftLauncher {
         }
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000); // 15 sec timeout
+        let timeout = setTimeout(() => controller.abort(), 15000); // 15 sec timeout
 
-        const response = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json', {
-          signal: controller.signal,
-          headers: { 'User-Agent': 'VellkoraMC/3.0' }
-        });
+        try {
+          const response = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json', {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'VellkoraMC/3.0' }
+          });
 
-        clearTimeout(timeout);
+          clearTimeout(timeout);
+          timeout = null;
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          const versions = data.versions
+            .filter(v => v.type === 'release')
+            .slice(0, 30)
+            .map(v => ({
+              id: v.id,
+              name: v.id,
+              type: v.type,
+              url: v.url,
+              releaseTime: v.releaseTime
+            }));
+
+          // Mettre en cache
+          this.versionsCache = versions;
+          this.versionsCacheTime = Date.now();
+          return versions;
+        } finally {
+          if (timeout) clearTimeout(timeout);
         }
-
-        const data = await response.json();
-
-        const versions = data.versions
-          .filter(v => v.type === 'release')
-          .slice(0, 30)
-          .map(v => ({
-            id: v.id,
-            name: v.id,
-            type: v.type,
-            url: v.url,
-            releaseTime: v.releaseTime
-          }));
-
-        // Mettre en cache
-        this.versionsCache = versions;
-        this.versionsCacheTime = Date.now();
-        return versions;
-      } catch (error) {
         lastError = error;
         // silent retry
       }
+      catch (error) {
+        lastError = error;
+        console.warn(`⚠️ Attempt ${attempt} to fetch versions failed: ${error.message}`);
+      }
     }
+    
 
     // Fallback: retourner une liste de versions en cache
     return [

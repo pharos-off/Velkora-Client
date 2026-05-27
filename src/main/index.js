@@ -32,8 +32,8 @@ const networkManager = new NetworkManager({
 });
 
 
-const LAUNCHER_VERSION = '4.2.5';
-const LAUNCHER_BUILD = '20260515';
+const LAUNCHER_VERSION = '4.2.7';
+const LAUNCHER_BUILD = '20260527';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {
@@ -218,6 +218,7 @@ const originalSpawn = childProcess.spawn;
 // (No global child_process wrappers — keep defaults)
 
 const store = new Store();
+console.log('📋 [INIT] Electron Store path:', store.path);
 let mainWindow;
 let loadingWindow = null;
 let settingsWindow = null;
@@ -228,6 +229,7 @@ let _discordCleaned = false;
 let minecraftRunning = false;
 let lastLaunchAttempt = 0;
 let lastGameClosedAt = 0;
+let tokenRefreshInterval = null;
 // Ignorer certaines erreurs bénignes lors de l’extinction (race Discord RPC)
 process.on('uncaughtException', (err) => {
   try {
@@ -692,7 +694,7 @@ function createLogsWindow() {
     </head>
     <body>
       <div class="titlebar">
-        <div class="titlebar-title">🎮 Mission Control / ${LAUNCHER_NAME} with ${os.version}</div>
+        <div class="titlebar-title">Mission Control / ${LAUNCHER_NAME} with ${os.version}</div>
         <div class="titlebar-buttons">
           <button class="titlebar-button minimize" id="minimize-btn" title="Réduire">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -900,6 +902,34 @@ function createTray() {
   }
 }
 
+// ✅ DÉMARRER LE TIMER DE RENOUVELLEMENT AUTOMATIQUE DU TOKEN
+function startTokenRefreshTimer() {
+  // Rafraîchir le token toutes les 8 heures pour éviter les déconnexions 24h
+  // (Microsoft tokens expirent après ~24h, donc 8h offre un margin confortable)
+  tokenRefreshInterval = setInterval(async () => {
+    try {
+      const authData = store.get('authData');
+      if (authData && _msAuthInstance) {
+        const isValid = await _msAuthInstance.ensureValidToken();
+        if (isValid) {
+          console.log('✅ Token auto-refreshed successfully');
+        } else {
+          console.warn('⚠️ Token auto-refresh failed');
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Token refresh timer error:', error.message);
+    }
+  }, 8 * 60 * 60 * 1000); // 8 heures
+}
+
+function stopTokenRefreshTimer() {
+  if (tokenRefreshInterval) {
+    clearInterval(tokenRefreshInterval);
+    tokenRefreshInterval = null;
+  }
+}
+
 // AJOUTER AVANT app.whenReady():
 
 // ✅ NETTOYER LE CACHE ELECTRON AU DÉMARRAGE POUR ÉVITER LES ERREURS D'ACCÈS
@@ -1068,6 +1098,9 @@ app.whenReady().then(async () => {
 // Nettoyer Discord à la fermeture
 app.on('before-quit', async () => {
   try {
+    // ✅ Arrêter le timer de renouvellement du token
+    stopTokenRefreshTimer();
+    
     if (discordRPC && !_discordCleaned) {
       _discordCleaned = true;
       try { await discordRPC.destroy(); } catch (e) { console.error('Discord destroy error:', e?.message || e); }
@@ -1174,7 +1207,32 @@ app.whenReady().then(async () => {
     app.setAppUserModelId('com.velkora-client.app');
   }
   
+  console.log('📋 [APP STARTUP] Checking for saved auth data...');
+  const startupAuthData = store.get('authData');
+  console.log('📋 [APP STARTUP] Saved auth data:', startupAuthData ? `${startupAuthData.username} (${startupAuthData.uuid})` : 'NULL');
+  
   initModsDirectory();
+  
+  // ✅ Valider et rafraîchir le token au démarrage si nécessaire
+  try {
+    const authData = store.get('authData');
+    if (authData && _msAuthInstance) {
+      console.log('🔐 [APP STARTUP] Validating token...');
+      const isValid = await _msAuthInstance.ensureValidToken();
+      if (isValid) {
+        console.log('✅ [APP STARTUP] Token validated on startup');
+      } else {
+        console.warn('⚠️ [APP STARTUP] Token validation failed on startup, user may need to re-authenticate');
+      }
+    } else {
+      console.log('📋 [APP STARTUP] No auth data or MicrosoftAuth instance to validate');
+    }
+  } catch (error) {
+    console.warn('⚠️ [APP STARTUP] Startup token validation error:', error.message);
+  }
+  
+  // ✅ Démarrer le timer de renouvellement automatique du token
+  startTokenRefreshTimer();
 
   
   // ✅ Retarder la création de la fenêtre principale pour laisser le loading screen s'afficher
@@ -1193,10 +1251,26 @@ app.whenReady().then(async () => {
   // ✅ VÉRIFIER ET INSTALLER LES MISES À JOUR AUTOMATIQUEMENT
   setTimeout(async () => {
     try {
+      const settings = store.get('settings', {});
+      const checkUpdateOnStartup = settings.checkUpdateOnStartup !== false;
+      const autoUpdate = settings.autoUpdate !== false;
+      
+      if (!checkUpdateOnStartup) {
+        console.log('[v] Auto-update check on startup is disabled');
+        return;
+      }
+      
       console.log('\n[o] Auto checking for updates on startup...');
-      const updateResult = await checkUpdatesAndInstall();
+      
+      // Vérifier les mises à jour sans installer automatiquement
+      const updateResult = await checkUpdatesWithSettings(autoUpdate);
+      
       if (updateResult.hasUpdate) {
-        console.log('✅ Automatic update in progress...');
+        if (autoUpdate) {
+          console.log('✅ Automatic update in progress...');
+        } else {
+          console.log('✅ Update available - notification sent');
+        }
       } else {
         console.log('[v] You are up to date');
       }
@@ -1284,21 +1358,31 @@ ipcMain.handle('get-available-ram', async () => {
 });
 
 // Authentification Microsoft
-ipcMain.handle('login-microsoft', async () => {
+ipcMain.handle('login-microsoft', async (event, options = {}) => {
+  const { forcePrompt = false } = options || {};
+
   try {
+    console.log('🔐 [login-microsoft] Handler called - forcePrompt:', forcePrompt);
     const savedAuth = store.get('authData', null);
-    if (savedAuth && savedAuth.type === 'microsoft') {
+    console.log('🔐 [login-microsoft] Saved auth in store:', savedAuth ? `${savedAuth.username} (${savedAuth.uuid})` : 'NULL');
+
+    if (!forcePrompt && savedAuth && savedAuth.type === 'microsoft') {
+      console.log('🔐 [login-microsoft] Found saved Microsoft auth, attempting to use it');
       if (!_msAuthInstance) {
-        _msAuthInstance = new MicrosoftAuth();
+        console.log('🔐 [login-microsoft] Creating new MicrosoftAuth instance');
+        _msAuthInstance = new MicrosoftAuth(store);
       }
       _msAuthInstance.tokenCache = savedAuth;
 
       // Si le token est valide, on évite de re-authentifier
+      console.log('🔐 [login-microsoft] Validating token...');
       const currentToken = await _msAuthInstance.ensureValidToken();
       if (currentToken) {
+        console.log('✅ [login-microsoft] Token validated successfully');
         const existing = store.get('authData');
         if (existing) {
           existing.accessToken = currentToken;
+          console.log('💾 [login-microsoft] Updating accessToken in store');
           store.set('authData', existing);
         }
         
@@ -1311,17 +1395,25 @@ ipcMain.handle('login-microsoft', async () => {
           });
         }
         
+        console.log('✅ [login-microsoft] Returning saved auth data');
         return { success: true, data: store.get('authData') };
       }
+      console.log('⚠️ [login-microsoft] Token validation failed, will authenticate');
     }
 
+    console.log('🔐 [login-microsoft] Starting new authentication flow');
     if (!_msAuthInstance) {
-      _msAuthInstance = new MicrosoftAuth();
+      console.log('🔐 [login-microsoft] Creating new MicrosoftAuth instance for new auth');
+      _msAuthInstance = new MicrosoftAuth(store);
     }
-    const result = await _msAuthInstance.authenticate();
+    const result = await _msAuthInstance.authenticate(forcePrompt);
     
     if (result.success) {
+      console.log('✅ [login-microsoft] Authentication successful, saving data');
+      console.log('   - username:', result.data.username);
+      console.log('   - uuid:', result.data.uuid);
       store.set('authData', result.data);
+      console.log('💾 [login-microsoft] authData saved to store');
       
       // 🎮 INITIALISER DISCORD EN ARRIÈRE-PLAN (NON-BLOQUANT)
       const discordEnabled = store.get('discord.rpcEnabled', true);
@@ -1335,9 +1427,10 @@ ipcMain.handle('login-microsoft', async () => {
       return result;
     }
     
+    console.log('❌ [login-microsoft] Authentication failed');
     return { success: false, error: 'Authentification échouée' };
   } catch (error) {
-    console.error('Erreur Microsoft Auth:', error);
+    console.error('❌ [login-microsoft] Erreur Microsoft Auth:', error);
     return { success: false, error: error.message || 'Erreur de connexion' };
   }
 });
@@ -1521,7 +1614,75 @@ ipcMain.handle('clear-minecraft-cache', async () => {
   }
 });
 
-// ...existing code...
+function getNotificationSettingsFromStore() {
+  const settings = store.get('notificationSettings', {});
+  return {
+    launchNotif: settings.launchNotif !== false,
+    downloadNotif: settings.downloadNotif !== false,
+    updateNotif: settings.updateNotif !== false,
+    errorNotif: settings.errorNotif !== false,
+    sound: settings.sound !== false,
+    volume: typeof settings.volume === 'number' ? settings.volume : 50
+  };
+}
+
+function playNotificationSoundInRenderer(volume = 0.5) {
+  try {
+    const payload = {
+      volume: Math.max(0, Math.min(volume, 1))
+    };
+
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.webContents.send('play-notification-sound', payload);
+      return;
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('play-notification-sound', payload);
+    }
+  } catch (error) {
+    console.warn('Unable to send notification sound event:', error);
+  }
+}
+
+function shouldShowNotification(type, settings = null) {
+  const notifSettings = settings || getNotificationSettingsFromStore();
+  switch (type) {
+    case 'launch': return notifSettings.launchNotif;
+    case 'download': return notifSettings.downloadNotif;
+    case 'update': return notifSettings.updateNotif;
+    case 'error': return notifSettings.errorNotif;
+    default: return true;
+  }
+}
+
+function showNotification(type, title, body, options = {}) {
+  try {
+    const notifSettings = getNotificationSettingsFromStore();
+    if (!shouldShowNotification(type, notifSettings)) {
+      return false;
+    }
+
+    const { Notification } = require('electron');
+    const notif = new Notification({
+      title,
+      body,
+      icon: getIconPath()
+    });
+    notif.show();
+
+    const shouldPlaySound = options.sound !== undefined ? options.sound : notifSettings.sound;
+    const volume = typeof options.volume === 'number' ? options.volume : notifSettings.volume;
+    if (shouldPlaySound) {
+      playNotificationSoundInRenderer(volume / 100);
+    }
+
+    return true;
+  } catch (error) {
+    console.warn('Notification error:', error);
+    return false;
+  }
+}
 
 // ✅ NOTIFICATIONS - OBTENIR LES PARAMETRES
 ipcMain.handle('get-notification-settings', async () => {
@@ -1534,7 +1695,7 @@ ipcMain.handle('get-notification-settings', async () => {
       updateNotif: notifSettings.updateNotif !== false,
       errorNotif: notifSettings.errorNotif !== false,
       sound: notifSettings.sound !== false,
-      volume: notifSettings.volume || 50
+      volume: typeof notifSettings.volume === 'number' ? notifSettings.volume : 50
     };
   } catch (error) {
     console.error('Error retrieving notifications:', error);
@@ -1555,10 +1716,12 @@ ipcMain.handle('save-notification-settings', async (event, settings) => {
 });
 
 // ✅ NOTIFICATIONS - TEST
-ipcMain.handle('test-notification', async (event, options) => {
+ipcMain.handle('test-notification', async (event, options = {}) => {
   try {
     const { Notification } = require('electron');
-    
+    const sound = options.sound !== undefined ? options.sound : true;
+    const volume = typeof options.volume === 'number' ? options.volume : getNotificationSettingsFromStore().volume;
+
     const notif = new Notification({
       title: 'Test de notification',
       body: `Ceci est un test de notification ${LAUNCHER_NAME}`,
@@ -1566,7 +1729,10 @@ ipcMain.handle('test-notification', async (event, options) => {
     });
 
     notif.show();
-    
+    if (sound) {
+      playNotificationSoundInRenderer(volume / 100);
+    }
+
     console.log('✅ Test notification sent');
     return { success: true };
   } catch (error) {
@@ -1731,12 +1897,45 @@ ipcMain.handle('logout', async () => {
 
 // Obtenir auth data
 ipcMain.handle('get-auth-data', async () => {
-  const authData = store.get('authData', null);
+  console.log('🔐 [get-auth-data] Handler called');
+  let authData = store.get('authData', null);
+  console.log('🔐 [get-auth-data] Retrieved from store:', authData ? `${authData.username} (${authData.uuid})` : 'NULL');
+  
   if (authData && authData.type !== 'microsoft') {
+    console.log('⚠️ [get-auth-data] Auth data is not Microsoft type, deleting');
     store.delete('authData');
     return null;
   }
-  return authData;
+
+  if (authData) {
+    try {
+      console.log('🔐 [get-auth-data] Validating auth token...');
+      if (!_msAuthInstance) {
+        console.log('🔐 [get-auth-data] Creating new MicrosoftAuth instance');
+        _msAuthInstance = new MicrosoftAuth(store);
+      }
+      _msAuthInstance.tokenCache = authData;
+
+      const validToken = await _msAuthInstance.ensureValidToken();
+      if (validToken) {
+        console.log('✅ [get-auth-data] Token is valid');
+        authData = store.get('authData', authData);
+        return authData;
+      }
+
+      // ⚠️ Si le token refresh échoue, on garde les données au lieu de les supprimer
+      // Cela peut être une erreur réseau temporaire, donc on ne les supprime que lors du lancement du jeu
+      console.warn('⚠️ [get-auth-data] Could not refresh token, but keeping saved data for next attempt');
+      authData = store.get('authData', authData);
+      return authData;
+    } catch (error) {
+      console.warn('⚠️ [get-auth-data] Error validating stored auth data:', error.message);
+      return authData;
+    }
+  }
+
+  console.log('❌ [get-auth-data] No auth data found');
+  return null;
 });
 
 function inferProfileLoader(profile = {}) {
@@ -2035,7 +2234,9 @@ ipcMain.handle('get-settings', async () => {
     useProtocolConnect: true,
     mcWidth: 1280,
     mcHeight: 720,
-    startupOnBoot: false
+    startupOnBoot: false,
+    autoUpdate: true,
+    checkUpdateOnStartup: true
   });
 });
 
@@ -2160,7 +2361,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
     // Raffraîchir le token Microsoft si nécessaire
     if (authData.type === 'microsoft') {
       if (!_msAuthInstance) {
-        _msAuthInstance = new MicrosoftAuth();
+        _msAuthInstance = new MicrosoftAuth(store);
       }
       _msAuthInstance.tokenCache = authData;
       const validToken = await _msAuthInstance.ensureValidToken();
@@ -2221,16 +2422,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
       // Notification de connexion en cours si un serveur est ciblé
       try {
         if (serverIP) {
-          const notifSettings = store.get('notificationSettings', {});
-          if (notifSettings.launchNotif !== false) {
-            const { Notification } = require('electron');
-            const notif = new Notification({
-              title: 'Connexion en cours',
-              body: `Connexion au serveur ${serverIP}…`,
-              icon: getIconPath()
-            });
-            notif.show();
-          }
+          showNotification('launch', 'Connexion en cours', `Connexion au serveur ${serverIP}…`);
         }
       } catch (_) {}
       
@@ -2321,6 +2513,9 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
         }
       });
 
+      if (result.downloadedVersion) {
+        showNotification('download', 'Téléchargement terminé', `Minecraft ${result.downloadedVersion} a été téléchargé et va se lancer.`);
+      }
       console.log('✅ Résultat lancement:', result);
       
       // Si le client s'est fermé immédiatement avec code non nul, notifier
@@ -2354,20 +2549,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
       }
       
       // ✅ NOTIFICATION: Lancement réussi
-      try {
-        const notifSettings = store.get('notificationSettings', {});
-        if (notifSettings.launchNotif !== false) {
-          const { Notification } = require('electron');
-          const notif = new Notification({
-            title: 'Minecraft lancé',
-            body: serverIP ? `Connexion à ${serverIP}` : 'Bon jeu !',
-            icon: getIconPath()
-          });
-          notif.show();
-        }
-      } catch (e) {
-        console.warn('Notification error:', e?.message || e);
-      }
+      showNotification('launch', 'Minecraft lancé', serverIP ? `Connexion à ${serverIP}` : 'Bon jeu !');
       
       console.log('='.repeat(60));
       console.log('✅ LANCEMENT TERMINÉ');
@@ -2391,20 +2573,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
       console.error('Stack:', launchError.stack);
       
       // ❌ NOTIFICATION: Erreur de lancement
-      try {
-        const notifSettings = store.get('notificationSettings', {});
-        if (notifSettings.errorNotif !== false) {
-          const { Notification } = require('electron');
-          const notif = new Notification({
-            title: 'Erreur de lancement',
-            body: launchError.message || 'Une erreur est survenue',
-            icon: getIconPath()
-          });
-          notif.show();
-        }
-      } catch (e) {
-        console.warn('Notification error:', e?.message || e);
-      }
+      showNotification('error', 'Erreur de lancement', launchError.message || 'Une erreur est survenue');
       
       // ✅ Réinitialiser l'état
       minecraftRunning = false;
@@ -2709,6 +2878,12 @@ ipcMain.on('toggle-fullscreen', (event, isFullscreen) => {
   }
 });
 
+ipcMain.on('theme-updated', (event, themeData = {}) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('theme-updated', themeData);
+  }
+});
+
 // ✅ HANDLERS POUR LA FENÊTRE DE LOGS
 ipcMain.on('minimize-logs-window', () => {
   if (logsWindow && !logsWindow.isDestroyed()) logsWindow.minimize();
@@ -2845,7 +3020,7 @@ ipcMain.handle('add-news', async (event, newsItem) => {
       content: newsItem.content,
       date: new Date().toISOString(),
       category: newsItem.category || 'general',
-      image: newsItem.image || '📰',
+      image: newsItem.image || '',
       featured: newsItem.featured || false
     };
     
@@ -2956,6 +3131,95 @@ async function checkUpdatesAndInstall() {
   }
 }
 
+// ✅ UPDATES - CHECK WITH SETTINGS (autoUpdate parameter handling)
+async function checkUpdatesWithSettings(autoUpdate = true) {
+  try {
+    const pkg = require('../../package.json');
+    const currentVersion = pkg.version;
+    
+    // Récupérer les releases
+    const response = await fetch('https://api.github.com/repos/pharos-off/Velkora/releases/', {
+      headers: { 'User-Agent': 'VellkoraMC' }
+    });
+    
+    if (!response.ok) {
+      return { hasUpdate: false, error: 'GitHub API unavailable' };
+    }
+    
+    const releases = await response.json();
+    
+    // Chercher la dernière release stable
+    let latestRelease = null;
+    let latestVersion = null;
+    
+    for (const release of releases) {
+      if (!release.draft && !release.prerelease && release.assets && release.assets.length > 0) {
+        const version = extractVersionFromReleaseName(release.name);
+        if (version) {
+          latestRelease = release;
+          latestVersion = version;
+          break;
+        }
+      }
+    }
+    
+    if (!latestRelease || !latestVersion) {
+      return { hasUpdate: false, error: 'No release found' };
+    }
+    
+    const hasUpdate = compareVersions(latestVersion, currentVersion) > 0;
+    
+    if (!hasUpdate) {
+      return { hasUpdate: false };
+    }
+    
+    // New version found!
+    console.log(`\n🎉 New version available: v${latestVersion}`);
+    
+    const exeAsset = latestRelease.assets.find(a => a.name.endsWith('.exe'));
+    if (!exeAsset) {
+      return { hasUpdate: true, error: 'No .exe file found' };
+    }
+    
+    // Si autoUpdate est activé, télécharger et installer
+    if (autoUpdate) {
+      const downloadUrl = exeAsset.browser_download_url;
+      const fileName = exeAsset.name;
+      const updatePath = path.join(os.tmpdir(), fileName);
+      
+      console.log(`📥 Downloading v${latestVersion}...`);
+      const downloadResponse = await fetch(downloadUrl);
+      
+      if (!downloadResponse.ok) {
+        return { hasUpdate: true, error: 'Download failed', needsManualInstall: true };
+      }
+      
+      const buffer = await downloadResponse.buffer();
+      fs.writeFileSync(updatePath, buffer);
+      
+      console.log(`✓ ${fileName} downloaded (${(buffer.length / 1024 / 1024).toFixed(2)}MB)`);
+      console.log('🚀 Automatic installation in progress...\n');
+      
+      // Launch the installer
+      await shell.openPath(updatePath);
+      
+      // Quit the app after a delay
+      setTimeout(() => {
+        app.quit();
+      }, 1000);
+      
+      return { hasUpdate: true, installed: true };
+    } else {
+      // Si autoUpdate est désactivé, juste envoyer une notification
+      showNotification('update', 'Mise à jour disponible', `Velkora v${latestVersion} est disponible ! Rendez-vous dans les paramètres pour l'installer.`);
+      return { hasUpdate: true, installed: false };
+    }
+  } catch (error) {
+    console.error('❌ Check-update error:', error.message);
+    return { hasUpdate: false, error: error.message };
+  }
+}
+
 // ✅ UPDATES - STOCKAGE DES DONNÉES DE MISE À JOUR
 let latestUpdateData = null;
 
@@ -3037,6 +3301,7 @@ ipcMain.handle('check-updates', async () => {
     
     if (hasUpdate) {
       console.log(`✅ New version available: v${latestVersion}`);
+      showNotification('update', 'Mise à jour disponible', `Velkora v${latestVersion} est disponible !`);
     } else {
       console.log('[v] You are using the latest version');
     }
@@ -3078,6 +3343,7 @@ ipcMain.handle('install-update', async () => {
     
     // Launch the installer using shell.openPath (proper way on Windows)
     await shell.openPath(updatePath);
+    showNotification('download', 'Téléchargement terminé', `Velkora v${latestUpdateData.latestVersion} a été téléchargé.`);
     
     // Close the app after a delay to ensure installer launches
     setTimeout(() => {

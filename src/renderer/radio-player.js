@@ -8,6 +8,15 @@ class MusicPlayer {
     this.isPlaying = false; // ✅ Flag pour tracker l'état de lecture
     this.loadPromise = null; // ✅ Promise pour gérer les chargements
     this.assetsPath = null; // ✅ Sera chargé via IPC
+
+    this.playerIcons = {
+      chill: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14c2-4 6-6 10-4s6 6 2 8"/><path d="M4 10c2 2 6 2 10 0"/></svg>',
+      lofi: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9v6h6"/><path d="M16 7h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><path d="M8 7H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></svg>',
+      gaming: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8z"/><path d="M16 12h-4"/><path d="M14 10v4"/></svg>',
+      focus: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v3"/><path d="M12 20v3"/><path d="M4.22 4.22l2.12 2.12"/><path d="M17.66 17.66l2.12 2.12"/><path d="M1 12h3"/><path d="M20 12h3"/></svg>',
+      phonk: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 12h14"/></svg>',
+      soon: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>'
+    };
     
     // ✅ Charger le chemin des assets via IPC
     const { ipcRenderer } = require('electron');
@@ -15,7 +24,7 @@ class MusicPlayer {
       this.assetsPath = path;
       console.log('✅ Assets path loaded:', this.assetsPath);
     }).catch(err => {
-      console.error('❌ Erreur chargement assets path:', err);
+      console.error('Erreur chargement assets path:', err);
     });
 
     // ✅ Sauvegarder le temps actuel toutes les secondes
@@ -27,46 +36,46 @@ class MusicPlayer {
 
     this.playlists = {
       chill: {
-        icon: '❄️',
+        icon: this.playerIcons.chill,
         name: 'Good Vibes',
         desc: 'Relaxing and mellow tunes',
         badge: 'Free',
         color: '#6366f1',
         tracks: [
-          { title: 'Good Vibes 🌴 Chill House Music 🌞', duration: '1:10:34' },
+          { title: 'Good Vibes Chill House Music', duration: '1:10:34' },
         ],
         files: [
           'chill/chill.mp3',
         ]
       },
       lofi: {
-        icon: '🎧',
+        icon: this.playerIcons.lofi,
         name: 'Lofi Hip Hop',
         desc: 'Study and relax beats',
         badge: 'Free',
         color: '#8b5cf6',
         tracks: [
-          { title: '5H Lofi Chill Beats to Relax, Study, Work & Sleep 🌙🎧 | Long Gil Lofi 💫 [No Ads]', duration: '5:02:17' }
+          { title: '5H Lofi Chill Beats to Relax, Study, Work & Sleep | Long Gil Lofi [No Ads]', duration: '5:02:17' }
         ],
         files: [
           'lofi/lofi.mp3',
         ]
       },
       gaming: {
-        icon: '⚔️',
+        icon: this.playerIcons.gaming,
         name: 'Gaming Hype',
         desc: 'Hard drops. Heavy bass.',
         badge: 'Premium',
         color: '#ec4899',
         tracks: [
-          { title: 'Cool Gaming Music 2024 ♫ Best Music Mix, NCS, Electronic, House ♫ Best Of EDM 2024', duration: '2:00:35' }
+          { title: 'Cool Gaming Music 2024 Best Music Mix, NCS, Electronic, House Best Of EDM 2024', duration: '2:00:35' }
         ],
         files: [
           'gaming/gaming.mp3'
         ]
       },
       focus: {
-        icon: '🎯',
+        icon: this.playerIcons.focus,
         name: 'Deep Focus',
         desc: 'Concentration and productivity',
         badge: 'Free',
@@ -79,13 +88,13 @@ class MusicPlayer {
         ]
       },
       phonk: {
-        icon: '🤘',
+        icon: this.playerIcons.phonk,
         name: 'Phonk Beats',
         desc: 'Retro vibes and smooth rhythms',
         badge: 'Premium',
         color: '#f59e0b',
         tracks: [
-          { title: 'AURA = ♾️ | 1 HOUR VIRAL AURA MUSIC PLAYLIST 2026 🔥 TRENDING PHONK HITS', duration: '1:10:14' },
+          { title: 'AURA = 1 HOUR VIRAL AURA MUSIC PLAYLIST 2026 TRENDING PHONK HITS', duration: '1:10:14' },
           { title: 'Phonk Music Mix 2025 ※ 1 HOUR AGGRESSIVE PHONK PLAYLIST ※ Фонка 2025', duration: '1:47:36' }
         ],
         files: [
@@ -95,7 +104,7 @@ class MusicPlayer {
       },
 
       invalide: {
-        icon: '❓',
+        icon: this.playerIcons.soon,
         name: 'Coming Soon',
         desc: 'This playlist is not yet available',
         badge: 'Soon',
@@ -108,7 +117,7 @@ class MusicPlayer {
         ]
       },
       invalide2: {
-        icon: '❓',
+        icon: this.playerIcons.soon,
         name: 'Coming Soon',
         desc: 'This playlist is not yet available',
         badge: 'Soon',
@@ -121,7 +130,7 @@ class MusicPlayer {
         ]
       },
       invalide3: {
-        icon: '❓',
+        icon: this.playerIcons.soon,
         name: 'Coming Soon',
         desc: 'This playlist is not yet available',
         badge: 'Soon',
@@ -134,7 +143,7 @@ class MusicPlayer {
         ]
       },
       invalide4: {
-        icon: '❓',
+        icon: this.playerIcons.soon,
         name: 'Coming Soon',
         desc: 'This playlist is not yet available',
         badge: 'Soon',
@@ -180,7 +189,7 @@ class MusicPlayer {
     
     const titleDiv = document.createElement('div');
     titleDiv.innerHTML = `
-      <h1 style="margin: 0; color: #e2e8f0; font-size: 32px; font-weight: 700;">🎵 Music Player</h1>
+      <h1 style="margin: 0; color: #e2e8f0; font-size: 32px; font-weight: 700;">Music Player</h1>
       <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 14px;">Selectionne une playlist et joue ta musique préférée</p>
     `;
 
@@ -303,7 +312,7 @@ class MusicPlayer {
     footer.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; line-height: 1.6; gap: 20px;">
         <div style="flex: 1; text-align: left;">
-          Powered by <span style="color: #6366f1; font-weight: 700;">MusicPlayer</span> 🎵
+          Powered by <span style="color: #6366f1; font-weight: 700;">MusicPlayer</span>
         </div>
         <div style="flex: 1; text-align: center;">
           © ${new Date().getFullYear()} Craft Launcher
@@ -411,7 +420,7 @@ class MusicPlayer {
       };
 
       const badgeColor = playlist.badge === 'Premium' ? '#f59e0b' : playlist.badge === 'Soon' ? '#64748b' : '#a78bfa';
-      const badgeIcon = playlist.badge === 'Premium' ? '⚡' : playlist.badge === 'Soon' ? '⏰' : '⭐';
+      const badgeIcon = '';
       const badgeRGB = playlist.badge === 'Premium' ? '245, 158, 11' : playlist.badge === 'Soon' ? '100, 116, 139' : '167, 139, 250';
 
       card.innerHTML = `
@@ -525,7 +534,7 @@ class MusicPlayer {
               console.error('Erreur lors de play():', err);
               const trackInfo = document.getElementById('music-track-info');
               if (trackInfo) {
-                trackInfo.textContent = '❌ Impossible de lire le fichier: ' + err.message;
+                trackInfo.textContent = 'Impossible de lire le fichier: ' + err.message;
               }
             });
           }
@@ -541,7 +550,7 @@ class MusicPlayer {
           const trackInfo = document.getElementById('music-track-info');
           if (trackInfo) {
             const errorMsg = this.audio.error?.message || 'Erreur inconnue';
-            trackInfo.textContent = '❌ Impossible de charger: ' + errorMsg;
+            trackInfo.textContent = 'Impossible de charger: ' + errorMsg;
           }
         };
         this.audio.addEventListener('error', errorHandler, { once: true });
@@ -549,10 +558,10 @@ class MusicPlayer {
         // ✅ Charger la source depuis le Blob URL
         this.audio.src = blobUrl;
       } catch (fileError) {
-        console.error('❌ Erreur lecture du fichier:', fileError);
+        console.error('Erreur lecture du fichier:', fileError);
         const trackInfo = document.getElementById('music-track-info');
         if (trackInfo) {
-          trackInfo.textContent = '❌ Fichier audio non trouvé: ' + file;
+          trackInfo.textContent = 'Fichier audio non trouvé: ' + file;
         }
       }
     } catch (err) {
@@ -567,7 +576,7 @@ class MusicPlayer {
 
     const trackInfo = document.getElementById('music-track-info');
     if (trackInfo) {
-      trackInfo.textContent = `▶ ${track.title} (${track.duration})`;
+      trackInfo.textContent = `${track.title} (${track.duration})`;
     }
   }
 

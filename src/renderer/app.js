@@ -5,14 +5,17 @@ const UIFeedback = require('./ui-feedback.js');
 const LauncherVersion = require('../main/launcher-version.js');
 const KeyboardShortcuts = require('../main/keyboard-shortcuts.js');
 const { icons: lucideIcons } = require('./lucide-icons');
+const ThemeManager = require('./theme-manager.js');
 //const MusicPlayer = require('./radio-player.js');
 
 // ✅ STUB GLOBAL POUR ÉVITER LES ERREURS DE TIMING
+window.themeManager = null; // Sera initialisé après DOM ready
 window.app = {
   render: () => console.warn('⚠️ app.render called before initialization'),
   currentView: 'login',
   showNewsDetail: (id) => console.warn('⚠️ showNewsDetail called before initialization', id),
-  launchGame: (ip) => console.warn('⚠️ launchGame called before initialization', ip)
+  launchGame: (ip) => console.warn('⚠️ launchGame called before initialization', ip),
+  themeManager: null
 };
 
 // Icônes SVG inline
@@ -27,6 +30,13 @@ const icons = {
   handshake: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 18a2 2 0 1 0 3 0 2 2 0 0 0-3 0Z"/><path d="M8 18a2 2 0 1 0 3 0 2 2 0 0 0-3 0Z"/><path d="m9 13-1 8"/><path d="m15 13 1 8"/><path d="m9 13-.753-6.374A2 2 0 0 1 10.185 5h3.63a2 2 0 0 1 1.938 1.626l-.753 6.374"/><path d="M11 11h2"/><path d="M6 11h2"/><path d="M4 7c0-1 1-2 2-2h.5a3 3 0 0 1 2 .88M18 7c0-1-1-2-2-2h-.5a3 3 0 0 0-2 .88"/></svg>',
   newspaper: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>',
   shoppingCart: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
+  rocket: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c-1.1 0-2 .9-2 2 0 1.6 1.9 4 2 4s2.4-2.4 2.4-4c0-1.1-.9-2-2.4-2z"/><path d="M6 19c0-3.1 2.5-5.6 5.6-5.6S17.2 15.9 17.2 19c0 .6-.8 1.6-2.4 1.6-1.1 0-2-.9-2-2s-.9-2-2-2c-1.6 0-2.4 1-2.4 1.6z"/><path d="M12 6.5C8.5 6.5 5.8 9.2 5.8 12.7c0 1.7.7 3.4 1.7 4.6l1.7-1.7c.6-.6 1.6-.6 2.2 0l1.7 1.7c1-1.3 1.7-2.9 1.7-4.6C18.2 9.2 15.5 6.5 12 6.5z"/></svg>',
+  moon: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+  shield: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  chevronLeft: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>',
+  chevronRight: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
+  image: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2" ry="2"/><circle cx="8" cy="10" r="2"/><path d="M21 15l-5-5-4 4-3-3-5 5"/></svg>',
+  archive: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v4H4z"/><path d="M4 11v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M10 15h4"/></svg>',
   settings: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
   logOut: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>',
   trash: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
@@ -58,6 +68,9 @@ const icons = {
 
 class CraftLauncherApp {
   constructor() {
+    // ✅ Initialiser le gestionnaire de thème en premier
+    window.themeManager = new ThemeManager();
+    
     this.currentView = 'login';
     this.authData = null;
     this.profiles = [];
@@ -76,21 +89,23 @@ class CraftLauncherApp {
     this.ui = new UIFeedback({ namespace: 'main-app-ui' });
     this.ui.installStyles();
     this.installUIFeedbackBridge();
+    this.applyInterfaceOptions();
     this.modsManager = new ModsManager(this);
     this.loadingScreenHidden = false;
     this.deferredDataPromise = null;
     this.shortcuts = new KeyboardShortcuts(this);
-  
-    // ✅ THÈME PERSONNALISÉ
-    this.theme = 'normal'; // 'normal', 'blanc', 'noir', 'custom'
-    this.customTheme = {
-      primaryColor: '#6366f1',
-      secondaryColor: '#8b5cf6',
-      backgroundColor: '#0f172a',
-      textColor: '#e2e8f0',
-      accentColor: '#10b981'
+    this.newsCategoryFilter = 'all';
+    
+    // ✅ Utiliser le gestionnaire de thème au lieu de dupliquer les données
+    this.themePresets = window.themeManager.themePresets;
+    this.accentColors = window.themeManager.accentColors;
+    
+    // ✅ Écouter les changements de thème du gestionnaire global
+    window.themeManager.onThemeChange((theme, accent) => {
+      this.applyThemeSelection(theme, true);
+      this.applyAccentColor(accent, true);
+    });
 
-    };
     this.fallbackAvatar = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" rx="20" ry="20" fill="#1e293b"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="48" fill="#94a3b8">👤</text></svg>');
 
     this.popularServers = [
@@ -118,6 +133,99 @@ class CraftLauncherApp {
         type
       });
     };
+  }
+
+  /**
+   * ✅ Applique le thème sélectionné
+   */
+  applyThemeSelection(theme, skipManagerUpdate = false) {
+    const currentTheme = window.themeManager?.currentTheme;
+    if (!skipManagerUpdate && window.themeManager && currentTheme !== theme) {
+      window.themeManager.setTheme(theme);
+    }
+    localStorage.setItem('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // 🎨 Appliquer automatiquement l'accent recommandé pour chaque thème
+    const themeAccentMap = {
+      dark: 'indigo',
+      light: 'blue',
+      neon: 'cyan',
+      metro: 'purple'
+    };
+    const recommendedAccent = themeAccentMap[theme] || 'indigo';
+    this.applyAccentColor(recommendedAccent);
+    
+    this.applyThemePalette(theme);
+    console.log(`[Theme] Applied: ${theme}`, window.themeManager?.getConsoleStyles());
+  }
+
+  applyThemePalette(theme) {
+    const preset = window.themeManager?.themePresets?.[theme] || window.themeManager?.themePresets?.dark;
+    if (!preset) return;
+
+    const styleId = 'theme-current-style';
+    let styleEl = document.getElementById(styleId);
+    if (styleEl) {
+      styleEl.remove();
+    }
+
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      body { background: ${preset.background} !important; color: ${preset.text} !important; }
+      .titlebar, .main-layout, .sidebar, .sidebar-menu, .settings-layout, .settings-sidebar, .settings-card, .settings-section, .view-container { background: ${preset.panel} !important; color: ${preset.text} !important; border-color: ${preset.border} !important; }
+      .titlebar, .menu-item, .menu-item.active, .menu-item:hover, .settings-search, .settings-footer, .setting-item { color: ${preset.text} !important; }
+      .menu-item.active, .menu-item:hover { color: ${preset.accent} !important; }
+      .theme-option.active { border-color: ${preset.accent} !important; }
+      .accent-option.active { box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important; }
+      .btn-primary { background: ${preset.accent} !important; border-color: ${preset.accent} !important; }
+      .btn-secondary { background: ${preset.surface} !important; color: ${preset.text} !important; }
+      a { color: ${preset.accent} !important; }
+    `;
+    document.head.appendChild(styleEl);
+  }
+
+  /**
+   * ✅ Applique la couleur d'accent
+   */
+  applyAccentColor(accent, skipManagerUpdate = false) {
+    const currentAccent = window.themeManager?.currentAccent;
+    if (!skipManagerUpdate && window.themeManager && currentAccent !== accent) {
+      window.themeManager.setAccent(accent);
+    }
+    localStorage.setItem('accent', accent);
+    document.documentElement.setAttribute('data-accent', accent);
+    console.log(`[Accent] Applied: ${accent}`);
+  }
+
+  /**
+   * ✅ Charge le thème au démarrage
+   */
+  loadTheme() {
+    const theme = localStorage.getItem('theme') || 'dark';
+    const accent = localStorage.getItem('accent') || 'indigo';
+    
+    if (window.themeManager) {
+      window.themeManager.setTheme(theme);
+      window.themeManager.setAccent(accent);
+    }
+    
+    this.applyThemeSelection(theme, true);
+    this.applyAccentColor(accent, true);
+  }
+
+  /**
+   * ✅ Applique les options d'interface (blur, animations, transparence)
+   */
+  applyInterfaceOptions() {
+    const blur = localStorage.getItem('blur-background') === 'true';
+    const animations = localStorage.getItem('animations') !== 'false'; // true par défaut
+    const transparency = localStorage.getItem('transparency') === 'true';
+
+    document.documentElement.setAttribute('data-blur', blur);
+    document.documentElement.setAttribute('data-animations', animations);
+    document.documentElement.setAttribute('data-transparency', transparency);
   }
 
   escapeHtml(value) {
@@ -232,14 +340,38 @@ class CraftLauncherApp {
 
 
   /**
-   * ✅ NETTOYER LES ANCIENS LISTENERS
+   * ✅ NETTOYER LES ANCIENS LISTENERS ET RESSOURCES
    */
   cleanupListeners() {
+    // Nettoyer les listeners IPC
     if (this.listeners.size > 0) {
       this.listeners.forEach((listener, event) => {
-        ipcRenderer.removeListener(event, listener);
+        try {
+          ipcRenderer.removeListener(event, listener);
+        } catch (err) {
+          console.error(`[Cleanup] Error removing listener for ${event}:`, err);
+        }
       });
       this.listeners.clear();
+    }
+    
+    // Nettoyer le listener de changement de vue
+    if (this.viewChangeListener && document) {
+      try {
+        document.removeEventListener('click', this.viewChangeListener);
+      } catch (err) {
+        console.error('[Cleanup] Error removing view listener:', err);
+      }
+      this.viewChangeListener = null;
+    }
+    
+    // Nettoyer les raccourcis clavier
+    if (this.shortcuts && typeof this.shortcuts.cleanup === 'function') {
+      try {
+        this.shortcuts.cleanup();
+      } catch (err) {
+        console.error('[Cleanup] Error cleaning up shortcuts:', err);
+      }
     }
   }
 
@@ -249,7 +381,11 @@ class CraftLauncherApp {
   addTrackedListener(event, callback) {
     // Supprimer l'ancien listener s'il existe
     if (this.listeners.has(event)) {
-      ipcRenderer.removeListener(event, this.listeners.get(event));
+      try {
+        ipcRenderer.removeListener(event, this.listeners.get(event));
+      } catch (err) {
+        console.warn(`[Listener] Failed to remove old listener for ${event}`);
+      }
     }
     
     ipcRenderer.on(event, callback);
@@ -257,43 +393,66 @@ class CraftLauncherApp {
   }
 
   async init() {
-    this.features = new LauncherFeatures(this);
-    await this.loadData();
-    
-    this.render();
-    //this.setupRadioWidget();
-    this.setupEventListeners();
-    await this.features.setupProfileEvents();
-    
-    // ✅ APPLIQUER LE FULLSCREEN SI ACTIVÉ
-    if (this.settings && this.settings.fullscreen) {
-      setTimeout(() => {
-        ipcRenderer.send('toggle-fullscreen', true);
-      }, 500);
-    }
-    
-    // ✅ VÉRIFIER LES MISES À JOUR APRÈS LE CHARGEMENT (EN SILENCIEUX)
-    setTimeout(async () => {
-      try {
-        const result = await ipcRenderer.invoke('check-updates');
-        if (result.hasUpdate) {
-          this.ui.showToast({
-            title: 'Mise a jour disponible',
-            message: `La version v${result.latestVersion} est prete. Ouvre les parametres pour l installer.`,
-            type: 'success',
-            duration: 8000
-          });
-        }
-      } catch (error) {
-        console.log('⚠️ Error checking updates:', error);
+    try {
+      console.log('📱 [RENDERER] init() called');
+      // ✅ CHARGER LE THÈME EN PREMIER (avant le rendu)
+      this.loadTheme();
+      
+      console.log('📱 [RENDERER] Loading data...');
+      this.features = new LauncherFeatures(this);
+      await this.loadData();
+      
+      console.log('📱 [RENDERER] Data loaded, authData:', this.authData ? `${this.authData.username} (${this.authData.uuid})` : 'NULL');
+      this.render();
+      console.log('📱 [RENDERER] render() completed');
+      //this.setupRadioWidget();
+      this.setupEventListeners();
+      await this.features.setupProfileEvents();
+      
+      // ✅ APPLIQUER LE FULLSCREEN SI ACTIVÉ
+      if (this.settings && this.settings.fullscreen) {
+        setTimeout(() => {
+          ipcRenderer.send('toggle-fullscreen', true);
+        }, 500);
       }
-    }, 2000);
+      
+      // ✅ VÉRIFIER LES MISES À JOUR APRÈS LE CHARGEMENT (EN SILENCIEUX)
+      setTimeout(async () => {
+        try {
+          const result = await ipcRenderer.invoke('check-updates');
+          if (result.hasUpdate) {
+            this.ui.showToast({
+              title: 'Mise a jour disponible',
+              message: `La version v${result.latestVersion} est prete. Ouvre les parametres pour l installer.`,
+              type: 'success',
+              duration: 8000
+            });
+          }
+        } catch (error) {
+          console.log('⚠️ Error checking updates:', error);
+        }
+      }, 2000);
+      
+      // ✅ ÉMETTRE UN ÉVÉNEMENT D'INITIALISATION
+      window.dispatchEvent(new CustomEvent('app-ready', { 
+        detail: { app: this, theme: this.themePresets } 
+      }));
+      console.log('✅ [Init] App successfully initialized');
+    } catch (error) {
+      console.error('❌ [Init] Initialization error:', error);
+      this.ui.showToast({
+        title: 'Erreur d\'initialisation',
+        message: error?.message || 'Une erreur est survenue au démarrage',
+        type: 'error'
+      });
+    }
     this.hideLoadingScreen();
     
     setInterval(() => this.updateFriendsStatus(), 30000);
   }
 
   async loadData() {
+    console.log('📱 [RENDERER] loadData() started');
     const [
       authData,
       profiles,
@@ -308,9 +467,15 @@ class CraftLauncherApp {
       ipcRenderer.invoke('get-friends')
     ]);
 
+    console.log('📱 [RENDERER] Received authData:', authData ? `${authData.username} (${authData.uuid})` : 'NULL');
+    console.log('📱 [RENDERER] Received profiles:', profiles ? profiles.length + ' profiles' : 'NULL');
+    console.log('📱 [RENDERER] Received settings:', settings ? 'OK' : 'NULL');
+    console.log('📱 [RENDERER] Received maxRam:', maxRam);
+    console.log('📱 [RENDERER] Received friends:', friends ? friends.length + ' friends' : 'NULL');
+
     this.authData = authData;
     if (this.authData) {
-      this.currentView = 'main';
+        this.authData = authData || {};
     }
 
     this.profiles = profiles;
@@ -406,14 +571,14 @@ class CraftLauncherApp {
     const email = document.getElementById('newsletter-email')?.value.trim();
     
     if (!email) {
-      alert('❌ Veuillez entrer une adresse email');
+      alert('Veuillez entrer une adresse email');
       return;
     }
     
     // Validation email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      alert('❌ Veuillez entrer une adresse email valide');
+      alert('Veuillez entrer une adresse email valide');
       return;
     }
     
@@ -422,8 +587,7 @@ class CraftLauncherApp {
     
     const originalText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '✓ Enregistrement...';
-    
+      btn.textContent = 'Enregistrement...';
     try {
       // Sauvegarder l'email dans le localStorage
       const subscribers = JSON.parse(localStorage.getItem('newsletter-subscribers') || '[]');
@@ -435,9 +599,9 @@ class CraftLauncherApp {
       // Envoyer l'email au serveur
       await ipcRenderer.invoke('subscribe-newsletter', { email });
       
-      alert('✅ Merci ! Vous êtes abonné à la newsletter');
+      alert('Merci ! Vous êtes abonné à la newsletter');
       document.getElementById('newsletter-email').value = '';
-      btn.textContent = '✓ Abonné';
+      btn.textContent = 'Abonné';
       
       setTimeout(() => {
         btn.disabled = false;
@@ -445,18 +609,26 @@ class CraftLauncherApp {
       }, 3000);
     } catch (error) {
       console.error('Erreur newsletter:', error);
-      alert('❌ Une erreur est survenue');
+      alert('Une erreur est survenue');
       btn.disabled = false;
       btn.textContent = originalText;
     }
   }
 
   render() {
+    console.log('📱 [RENDERER] render() called - authData:', this.authData ? `${this.authData.username}` : 'NULL');
     const appContainer = document.getElementById('app');
     if (!this.authData) {
+      console.log('📱 [RENDERER] authData is NULL, switching to login view');
       this.currentView = 'login';
+    } else {
+      console.log('📱 [RENDERER] authData found, keeping current view:', this.currentView);
+      if (!this.currentView || this.currentView === 'login') {
+        this.currentView = 'main';
+      }
     }
     if (this.currentView === 'login') {
+      console.log('📱 [RENDERER] Rendering LOGIN view');
       appContainer.innerHTML = this.renderLogin();
       this.setupLoginEvents();
     } else {
@@ -481,96 +653,8 @@ class CraftLauncherApp {
       const theme = localStorage.getItem('theme') || 'dark';
       const accent = localStorage.getItem('accent') || 'indigo';
       
-      const root = document.documentElement;
-      
-      // Ajouter un style global pour forcer les couleurs
-      let styleId = 'theme-dynamic-styles';
-      let existingStyle = document.getElementById(styleId);
-      if (existingStyle) existingStyle.remove();
-      
-      const styleEl = document.createElement('style');
-      styleEl.id = styleId;
-      
-      if (theme === 'light') {
-        styleEl.textContent = `
-          * { color: #000000 !important; }
-          .brand-user { color: #000000 !important; }
-          .menu-item { color: #000000 !important; }
-          .view-title { color: #000000 !important; }
-          h1, h2, h3, h4, h5, h6 { color: #000000 !important; }
-          p, span, div, label { color: #000000 !important; }
-        `;
-      }
-      document.head.appendChild(styleEl);
-      
-      // Appliquer sur document et body
-      if (theme === 'dark') {
-        document.body.style.background = '#0f172a';
-        document.body.style.color = '#e2e8f0';
-        root.style.setProperty('--bg-dark', '#0f172a');
-      } else if (theme === 'light') {
-        document.body.style.background = '#f1f5f9';
-        document.body.style.color = '#000000';
-        root.style.setProperty('--bg-dark', '#f1f5f9');
-      }
-      
-      // Appliquer aussi sur .main-layout et .sidebar
-      const mainLayout = document.querySelector('.main-layout');
-      const sidebar = document.querySelector('.sidebar');
-      const mainContent = document.querySelector('.main-content');
-      
-      if (mainLayout) {
-        if (theme === 'dark') {
-          mainLayout.style.background = '#0f172a';
-          mainLayout.style.color = '#e2e8f0';
-        } else {
-          mainLayout.style.background = '#f1f5f9';
-          mainLayout.style.color = '#000000';
-        }
-      }
-      
-      if (sidebar) {
-        if (theme === 'dark') {
-          sidebar.style.background = 'rgba(15, 23, 42, 0.8)';
-          sidebar.style.color = '#e2e8f0';
-        } else {
-          sidebar.style.background = 'rgba(241, 245, 249, 0.9)';
-          sidebar.style.color = '#000000';
-        }
-      }
-      
-      if (mainContent) {
-        if (theme === 'dark') {
-          mainContent.style.background = '#0f172a';
-        } else {
-          mainContent.style.background = '#f1f5f9';
-        }
-      }
-      
-      const accentColors = {
-        indigo: '#6366f1',
-        purple: '#a855f7',
-        blue: '#3b82f6',
-        cyan: '#06b6d4'
-      };
-      const accentColor = accentColors[accent];
-      root.style.setProperty('--color-accent', accentColor);
-      
-      // Ajouter le style pour l'accent
-      let accentStyleId = 'accent-dynamic-styles';
-      let accentExistingStyle = document.getElementById(accentStyleId);
-      if (accentExistingStyle) accentExistingStyle.remove();
-      
-      const accentStyleEl = document.createElement('style');
-      accentStyleEl.id = accentStyleId;
-      accentStyleEl.textContent = `
-        .btn-primary { background: ${accentColor} !important; }
-        .btn-secondary:hover { border-color: ${accentColor} !important; color: ${accentColor} !important; }
-        .accent-option[data-accent="${accent}"] { box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important; }
-        .menu-item.active { color: ${accentColor} !important; }
-        a { color: ${accentColor} !important; }
-      `;
-      document.head.appendChild(accentStyleEl);
+      this.applyThemeSelection(theme);
+      this.applyAccentColor(accent);
       
       // Puis charger le contenu asynchrone
       this.renderContentAsync();
@@ -582,18 +666,52 @@ class CraftLauncherApp {
     const contentDiv = document.getElementById('main-content-view');
     if (!contentDiv) return;
 
-    // Supprimer les event listeners des anciens éléments
-    const oldElements = contentDiv.querySelectorAll('[data-listener]');
-    oldElements.forEach(el => {
-      el.remove();
-    });
+    try {
+      // ✅ Supprimer les event listeners des anciens éléments
+      const oldElements = contentDiv.querySelectorAll('[data-listener]');
+      oldElements.forEach(el => {
+        try {
+          el.replaceWith(el.cloneNode(true)); // Remplacer l'élément pour supprimer les listeners
+        } catch (err) {
+          console.warn('[Cleanup] Error removing element:', err);
+        }
+      });
 
-    // Nettoyer les références
-    contentDiv.innerHTML = '';
-    
-    // Forcer le garbage collector si disponible
-    if (global.gc) {
-      global.gc();
+      // ✅ Supprimer les événements audio
+      const audioElements = contentDiv.querySelectorAll('audio, video');
+      audioElements.forEach(el => {
+        try {
+          el.pause();
+          el.src = '';
+          el.remove();
+        } catch (err) {
+          console.warn('[Cleanup] Error removing audio/video:', err);
+        }
+      });
+
+      // ✅ Nettoyer les styles injectés
+      const styleElements = contentDiv.querySelectorAll('style');
+      styleElements.forEach(el => {
+        try {
+          el.remove();
+        } catch (err) {
+          console.warn('[Cleanup] Error removing style:', err);
+        }
+      });
+
+      // ✅ Nettoyer le contenu
+      contentDiv.innerHTML = '';
+      
+      // ✅ Forcer le garbage collector si disponible
+      if (typeof global !== 'undefined' && global.gc) {
+        try {
+          global.gc();
+        } catch (err) {
+          console.warn('[Cleanup] GC error:', err);
+        }
+      }
+    } catch (error) {
+      console.error('[Cleanup] Error during view cleanup:', error);
     }
   }
 
@@ -610,78 +728,24 @@ class CraftLauncherApp {
       
       const html = await this.renderCurrentView();
       contentDiv.innerHTML = html;
+      const scripts = Array.from(contentDiv.querySelectorAll('script'));
+      scripts.forEach(script => {
+        const newScript = document.createElement('script');
+        if (script.src) {
+          newScript.src = script.src;
+        } else {
+          newScript.textContent = script.textContent;
+        }
+        document.head.appendChild(newScript);
+        script.remove();
+      });
       
       // ✅ RÉAPPLIQUER LE THÈME APRÈS LE RENDU (sans render() pour éviter boucle)
       const theme = localStorage.getItem('theme') || 'dark';
       const accent = localStorage.getItem('accent') || 'indigo';
       
-      const root = document.documentElement;
-      
-      // Appliquer partout
-      const mainLayout = document.querySelector('.main-layout');
-      const sidebar = document.querySelector('.sidebar');
-      const mainContent = document.querySelector('.main-content');
-      
-      if (mainLayout) {
-        if (theme === 'dark') {
-          mainLayout.style.background = '#0f172a';
-          mainLayout.style.color = '#e2e8f0';
-        } else {
-          mainLayout.style.background = '#f1f5f9';
-          mainLayout.style.color = '#000000';
-        }
-      }
-      
-      if (sidebar) {
-        if (theme === 'dark') {
-          sidebar.style.background = 'rgba(15, 23, 42, 0.8)';
-          sidebar.style.color = '#e2e8f0';
-        } else {
-          sidebar.style.background = 'rgba(241, 245, 249, 0.9)';
-          sidebar.style.color = '#000000';
-        }
-      }
-      
-      if (mainContent) {
-        if (theme === 'dark') {
-          mainContent.style.background = '#0f172a';
-        } else {
-          mainContent.style.background = '#f1f5f9';
-        }
-      }
-      
-      if (theme === 'dark') {
-        document.body.style.background = '#0f172a';
-        document.body.style.color = '#e2e8f0';
-      } else if (theme === 'light') {
-        document.body.style.background = '#f1f5f9';
-        document.body.style.color = '#000000';
-      }
-      
-      const accentColors = {
-        indigo: '#6366f1',
-        purple: '#a855f7',
-        blue: '#3b82f6',
-        cyan: '#06b6d4'
-      };
-      const accentColor = accentColors[accent];
-      root.style.setProperty('--color-accent', accentColor);
-      
-      // Ajouter le style pour l'accent
-      let accentStyleId = 'accent-dynamic-styles';
-      let accentExistingStyle = document.getElementById(accentStyleId);
-      if (accentExistingStyle) accentExistingStyle.remove();
-      
-      const accentStyleEl = document.createElement('style');
-      accentStyleEl.id = accentStyleId;
-      accentStyleEl.textContent = `
-        .btn-primary { background: ${accentColor} !important; }
-        .btn-secondary:hover { border-color: ${accentColor} !important; color: ${accentColor} !important; }
-        .accent-option[data-accent="${accent}"] { box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important; }
-        .menu-item.active { color: ${accentColor} !important; }
-        a { color: ${accentColor} !important; }
-      `;
-      document.head.appendChild(accentStyleEl);
+      this.applyThemeSelection(theme);
+      this.applyAccentColor(accent);
       
       this.setupMainEvents();
     } catch (error) {
@@ -984,7 +1048,7 @@ renderMainLayout() {
           <p class="login-subtitle">L'expérience Minecraft ultime</p>
 
           <button id="ms-login-btn" class="login-button login-button-primary">
-            <span>🪟</span>
+            <span>Microsoft</span>
             <span>Se connecter avec Microsoft</span>
           </button>
 
@@ -2221,7 +2285,7 @@ renderMainLayout() {
                 <div class="friend-info">
                   <h3>${f.username}</h3>
                   <div class="friend-status ${f.online ? 'online' : 'offline'}">
-                    ${f.online ? '🟢 En ligne' : '⚫ Hors ligne'}
+                    ${f.online ? '<span style="color: #10b981;">En ligne</span>' : '<span style="color: #6b7280;">Hors ligne</span>'}
                   </div>
                 </div>
                 <button class="btn-icon" data-remove-friend="${f.id}" style="color: #ef4444;">${lucideIcons.trash3}</button>
@@ -2406,11 +2470,11 @@ renderMainLayout() {
             </div>
             <div>
               <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Mises à jour automatiques</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">✓ Activées</p>
+              <p style="color: #94a3b8; margin: 0; font-size: 14px;">Activées</p>
             </div>
             <div>
               <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">État</p>
-              <p style="color: #4ade80; margin: 0; font-size: 14px;">🟢 Opérationnel</p>
+              <p style="color: #4ade80; margin: 0; font-size: 14px;">Opérationnel</p>
             </div>
           </div>
         </div>
@@ -2439,7 +2503,7 @@ renderMainLayout() {
             badge.style.background = 'rgba(34,197,94,0.2)';
             badge.style.borderColor = 'rgba(34,197,94,0.4)';
             badge.style.color = '#4ade80';
-            badge.textContent = '✓ À jour';
+            badge.textContent = 'À jour';
           } else {
             badge.style.background = 'rgba(239,68,68,0.12)';
             badge.style.borderColor = 'rgba(239,68,68,0.25)';
@@ -2512,14 +2576,14 @@ renderMainLayout() {
     const partners = [
       { 
         name: 'PharosSMP',
-        logo: '🛡️',
+        logo: icons.shield,
         description: 'Un serveur SMP privé pour les membres de la communauté Pharos',
         website: 'http://176.161.97.30',
         joinUrl: '176.161.97.30'
       },
       { 
         name: 'LunaVerse',
-        logo: '🌕',
+        logo: icons.moon,
         description: 'Un serveur communautaire rassemblant plusieurs projets !',
         website: '',
         joinUrl: ''
@@ -2539,14 +2603,14 @@ renderMainLayout() {
         <div class="partners-grid">
           ${partners.map((partner, index) => `
             <div class="partner-card" style="animation: slideIn 0.5s ease-out ${index * 0.1}s both;">
-              <div class="partner-logo">${partner.logo}</div>
+              <div class="partner-logo" style="display:flex; align-items:center; justify-content:center; width:56px; height:56px; border-radius:18px; background: rgba(99, 102, 241, 0.12); box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.1);">${partner.logo}</div>
               
               <div class="partner-content">
                 <h3>${partner.name}</h3>
                 <p class="partner-description">${partner.description}</p>
                 
                 <div class="partner-badges">
-                  <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #6366f1;">✓ Partenaire Officiel</span>
+                  <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #6366f1;">Partenaire officiel</span>
                 </div>
               </div>
 
@@ -2692,61 +2756,87 @@ renderMainLayout() {
         <div class="view-container">
           <h1 class="view-title">${icons.newspaper} Actualités</h1>
           <div style="text-align: center; padding: 60px 20px; color: #9ca3af;">
-            <p>📰 Aucune actualité disponible pour le moment</p>
+            <p>${icons.newspaper} Aucune actualité disponible pour le moment</p>
           </div>
         </div>
       `;
     }
 
-    // Grouper les actualités par catégorie
     const categories = {};
     this.news.forEach(news => {
-      if (!categories[news.category]) {
-        categories[news.category] = [];
+      const category = news.category || 'general';
+      if (!categories[category]) {
+        categories[category] = [];
       }
-      categories[news.category].push(news);
+      categories[category].push(news);
     });
 
+    const categoryOrder = ['all', 'launcher', 'minecraft', 'servers', 'mods', 'events', 'general'];
+    const allCategories = Array.from(new Set([...categoryOrder, ...Object.keys(categories)]));
+
     const categoryLabels = {
-      launcher: '🚀 Launcher',
-      minecraft: ' Minecraft',
-      servers: '🔧 Serveurs',
-      mods: '🎨 Mods',
-      events: '🏆 Événements',
-      general: '📢 Général'
+      all: 'Toutes',
+      launcher: 'Launcher',
+      minecraft: 'Minecraft',
+      servers: 'Serveurs',
+      mods: 'Mods',
+      events: 'Événements',
+      general: 'Général'
     };
+
+    const activeCategory = this.newsCategoryFilter || 'all';
+    const filteredNews = activeCategory === 'all'
+      ? this.news
+      : this.news.filter(news => (news.category || 'general') === activeCategory);
+
+    const filteredCategories = {};
+    filteredNews.forEach(news => {
+      const category = news.category || 'general';
+      if (!filteredCategories[category]) {
+        filteredCategories[category] = [];
+      }
+      filteredCategories[category].push(news);
+    });
 
     return `
       <div class="view-container" style="max-width: 1200px; margin: 0 auto;">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 32px;">
-          <h1 class="view-title" style="margin: 0;">${icons.newspaper} Actualités</h1>
-          <span style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;">
-            ${this.news.length} actualité${this.news.length > 1 ? 's' : ''}
-          </span>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px;">
+          <div>
+            <h1 class="view-title" style="margin: 0;">${icons.newspaper} Actualités</h1>
+            <div style="color: #94a3b8; margin-top: 6px; font-size: 14px;">${filteredNews.length} actualité${filteredNews.length > 1 ? 's' : ''} affichée${filteredNews.length > 1 ? 's' : ''}</div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            ${allCategories.map(category => `
+              <button type="button" data-news-filter="${category}" class="news-filter-pill${activeCategory === category ? ' active' : ''}">
+                ${categoryLabels[category] || category}
+                ${category !== 'all' ? `<span style="margin-left: 6px; background: rgba(255,255,255,0.12); padding: 0 8px; border-radius: 999px; font-size: 12px;">${categories[category]?.length || 0}</span>` : ''}
+              </button>
+            `).join('')}
+          </div>
         </div>
 
         <div style="display: grid; gap: 24px;">
-          ${Object.entries(categories).map(([category, items]) => `
+          ${Object.entries(filteredCategories).map(([category, items]) => `
             <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; overflow: hidden;">
               <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); padding: 16px; border-bottom: 1px solid rgba(99, 102, 241, 0.2);">
                 <h2 style="margin: 0; font-size: 16px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-                  <span>${categoryLabels[category] || '📚 ' + category}</span>
+                  <span>${categoryLabels[category] || category}</span>
                   <span style="background: rgba(99, 102, 241, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 12px; color: #a5b4fc;">${items.length}</span>
                 </h2>
               </div>
               <div style="display: grid; gap: 1px; background: rgba(99, 102, 241, 0.1);">
                 ${items.map(news => `
-                  <div class="news-card-item" data-news-id="${news.id}" style="background: rgba(15, 23, 42, 0.6); padding: 20px; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent; hover-background: rgba(99, 102, 241, 0.1);">
+                  <div class="news-card-item" data-news-id="${news.id}" style="background: rgba(15, 23, 42, 0.6); padding: 20px; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent;">
                     <div style="display: flex; gap: 16px; align-items: flex-start;">
-                      <div style="font-size: 32px; flex-shrink: 0;">${news.image || '📰'}</div>
+                      <div style="font-size: 32px; flex-shrink: 0;">${news.image || icons.newspaper}</div>
                       <div style="flex: 1; min-width: 0;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                           <h3 style="margin: 0; font-size: 16px; color: #e2e8f0; font-weight: 600;">${news.title}</h3>
                           ${news.featured ? '<span style="background: rgba(255, 193, 7, 0.3); color: #fcd34d; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">EN VEDETTE</span>' : ''}
                         </div>
                         <p style="margin: 0 0 8px 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">${news.excerpt}</p>
-                        <div style="display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 12px;">
-                          <span>📅 ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: #64748b; font-size: 12px;">
+                          <span style="display: inline-flex; align-items: center; gap: 6px;">${icons.calendar} ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                           ${news.category ? `<span style="background: rgba(99, 102, 241, 0.2); padding: 2px 8px; border-radius: 4px;">${categoryLabels[news.category] || news.category}</span>` : ''}
                         </div>
                       </div>
@@ -2759,6 +2849,25 @@ renderMainLayout() {
         </div>
 
         <style>
+          .news-filter-pill {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(15, 23, 42, 0.8);
+            color: #cbd5e1;
+            padding: 10px 16px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .news-filter-pill.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(79, 70, 229, 0.9));
+            color: #ffffff;
+            border-color: transparent;
+            transform: translateY(-1px);
+          }
           .news-card-item:hover {
             background: rgba(99, 102, 241, 0.08) !important;
             border-left-color: rgba(99, 102, 241, 0.5) !important;
@@ -2774,11 +2883,11 @@ renderMainLayout() {
       <div class="view-container" style="padding: 40px;">
         <!-- Modal pour visualiser les screenshots -->
         <div id="screenshot-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
-          <button id="modal-close-btn" style="position: absolute; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 14px;">✕ Fermer</button>
+          <button id="modal-close-btn" style="position: absolute; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16); color: white; padding: 10px 15px; border-radius: 12px; cursor: pointer; font-size: 14px;">Fermer</button>
           <div style="display: flex; gap: 20px; align-items: center; max-width: 90vw; max-height: 80vh;">
-            <button id="modal-prev-btn" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; width: 50px; height: 50px; font-size: 20px; border-radius: 8px; cursor: pointer;">◀</button>
-            <img id="modal-image" src="" style="max-width: 75vw; max-height: 75vh; border-radius: 8px; object-fit: contain;">
-            <button id="modal-next-btn" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); color: white; width: 50px; height: 50px; font-size: 20px; border-radius: 8px; cursor: pointer;">▶</button>
+            <button id="modal-prev-btn" style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); color: #e2e8f0; width: 52px; height: 52px; border-radius: 14px; cursor: pointer; display:flex; align-items:center; justify-content:center;">${icons.chevronLeft}</button>
+            <img id="modal-image" src="" style="max-width: 75vw; max-height: 75vh; border-radius: 16px; object-fit: contain; box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);">
+            <button id="modal-next-btn" style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); color: #e2e8f0; width: 52px; height: 52px; border-radius: 14px; cursor: pointer; display:flex; align-items:center; justify-content:center;">${icons.chevronRight}</button>
           </div>
           <div id="modal-info" style="color: #cbd5e1; margin-top: 20px; text-align: center; font-size: 14px;"></div>
         </div>
@@ -2786,16 +2895,16 @@ renderMainLayout() {
         <!-- Screenshots Section -->
         <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 28px; margin-bottom: 30px;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-            <span style="font-size: 24px;">📸</span>
+            <span style="font-size: 24px;">${icons.image}</span>
             <h2 style="font-size: 20px; color: #e2e8f0; margin: 0; font-weight: 700;">Screenshots</h2>
           </div>
           <p style="color: #cbd5e1; margin-bottom: 20px; line-height: 1.5;">Visualisez et organisez tous vos screenshots Minecraft. Cliquez sur une vignette pour l'agrandir.</p>
           <div style="display: flex; gap: 12px; margin-bottom: 20px;">
             <button id="btn-open-screenshots" class="btn-primary" style="flex: 1; padding: 12px;">
-              <span style="display: inline-flex; width: 18px; height: 18px; margin-right: 8px;">📂</span> Ouvrir le dossier
+              <span style="display: inline-flex; width: 18px; height: 18px; margin-right: 8px;">${icons.folder}</span> Ouvrir le dossier
             </button>
             <button id="btn-refresh-screenshots" class="btn-secondary" style="flex: 1; padding: 12px;">
-              <span style="display: inline-flex; width: 16px; height: 16px; margin-right: 8px;">🔄</span> Rafraîchir
+              <span style="display: inline-flex; width: 16px; height: 16px; margin-right: 8px;">${icons.refresh}</span> Rafraîchir
             </button>
           </div>
           <div id="screenshots-gallery" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; min-height: 200px;">
@@ -2809,15 +2918,15 @@ renderMainLayout() {
           <!-- Saves Section -->
           <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 28px; display: flex; flex-direction: column;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-              <span style="font-size: 24px;">💾</span>
+              <span style="font-size: 24px;">${icons.download}</span>
               <h2 style="font-size: 20px; color: #e2e8f0; margin: 0; font-weight: 700;">Sauvegardes</h2>
             </div>
             <p style="color: #cbd5e1; margin-bottom: 20px; line-height: 1.5;">Gérez toutes vos sauvegardes de mondes Minecraft. Sauvegardez, dupliquez ou supprimez vos mondes facilement avec notre gestionnaire intégré.</p>
             <button id="btn-open-saves" class="btn-primary" style="width: 100%; margin-bottom: 12px; padding: 14px;">
-              <span style="display: inline-flex; width: 18px; height: 18px; margin-right: 8px;">📂</span> Ouvrir le dossier
+              <span style="display: inline-flex; width: 18px; height: 18px; margin-right: 8px;">${icons.folder}</span> Ouvrir le dossier
             </button>
             <button id="btn-refresh-saves" class="btn-secondary" style="width: 100%; padding: 12px;">
-              <span style="display: inline-flex; width: 16px; height: 16px; margin-right: 8px;">🔄</span> Rafraîchir
+              <span style="display: inline-flex; width: 16px; height: 16px; margin-right: 8px;">${icons.refresh}</span> Rafraîchir
             </button>
             <div id="saves-info" style="margin-top: 20px; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 8px; color: #94a3b8; font-size: 12px;">
               Chargement...
@@ -2851,7 +2960,7 @@ renderMainLayout() {
         try {
           screenshots = await ipcRenderer.invoke('get-screenshots-list');
           const result = await ipcRenderer.invoke('get-screenshots-count');
-          screenshotsInfo.textContent = `📸 ${result.count} screenshot(s) trouvé(s)`;
+          screenshotsInfo.textContent = `${result.count} screenshot(s) trouvé(s)`;
           
           if (screenshots.length === 0) {
             screenshotsGallery.innerHTML = '<div style="grid-column: 1 / -1; color: #cbd5e1; text-align: center; padding: 40px; color: #94a3b8;">Aucun screenshot trouvé</div>';
@@ -2949,14 +3058,14 @@ renderMainLayout() {
       refreshSavesBtn?.addEventListener('click', async () => {
         savesInfo.textContent = 'Chargement...';
         const result = await ipcRenderer.invoke('get-saves-count').catch(() => ({ count: 0, folder: '' }));
-        savesInfo.textContent = `💾 ${result.count} monde(s) sauvegardé(s)`;
+        savesInfo.textContent = `${result.count} monde(s) sauvegardé(s)`;
       });
 
       // Initial load
       (async () => {
         await loadScreenshots();
         const savesResult = await ipcRenderer.invoke('get-saves-count').catch(() => ({ count: 0 }));
-        savesInfo.textContent = `💾 ${savesResult.count} monde(s) sauvegardé(s)`;
+        savesInfo.textContent = `${savesResult.count} monde(s) sauvegardé(s)`;
       })();
     }, 100);
 
@@ -3053,7 +3162,7 @@ renderMainLayout() {
     return `
       <div class="resourcepack-item" data-pack-name="${this.escapeHtml(pack.name || '')}" data-file-name="${this.escapeHtml(pack.fileName || '')}" data-pack-path="${this.escapeHtml(pack.path || '')}" data-pack-size="${this.escapeHtml(pack.size || '')}" data-pack-type="${this.escapeHtml(pack.type || '')}" data-imported-at="${this.escapeHtml(pack.importedAt || '')}" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 16px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; transition: all 0.3s; width: 100%; min-width: 0; margin-bottom: 12px; cursor: pointer;">
         <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
-          <div style="width: 20px; text-align: center; flex-shrink: 0;">${pack.type === 'folder' ? '📁' : '🖼️'}</div>
+          <div style="width: 20px; text-align: center; flex-shrink: 0;">${pack.type === 'folder' ? icons.folder : icons.image}</div>
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 8px; min-width: 0;">
               <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${this.escapeHtml(pack.name || pack.fileName || 'Texture pack')}</span>
@@ -3076,8 +3185,8 @@ renderMainLayout() {
     return `
       <div style="max-width: 1000px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
         ${this.renderStatCard('Packs installes', packs.length, icons.download)}
-        ${this.renderStatCard('Archives', archiveCount, '🗜️', '#22c55e')}
-        ${this.renderStatCard('Dossiers', folderCount, '📁', '#f59e0b')}
+        ${this.renderStatCard('Archives', archiveCount, icons.archive, '#22c55e')}
+        ${this.renderStatCard('Dossiers', folderCount, icons.folder, '#f59e0b')}
       </div>
     `;
   }
@@ -3109,7 +3218,7 @@ renderMainLayout() {
         <div class="view-container">
           <h1 class="view-title">${icons.newspaper} Actualités</h1>
           <div style="text-align: center; padding: 60px 20px; color: #9ca3af;">
-            <p>📰 Aucune actualité disponible pour le moment</p>
+            <p>${icons.newspaper} Aucune actualité disponible pour le moment</p>
           </div>
         </div>
       `;
@@ -3125,12 +3234,12 @@ renderMainLayout() {
     });
 
     const categoryLabels = {
-      launcher: '🚀 Launcher',
-      minecraft: ' Minecraft',
-      servers: '🔧 Serveurs',
-      mods: '🎨 Mods',
-      events: '🏆 Événements',
-      general: '📢 Général'
+      launcher: 'Launcher',
+      minecraft: 'Minecraft',
+      servers: 'Serveurs',
+      mods: 'Mods',
+      events: 'Événements',
+      general: 'Général'
     };
 
     return `
@@ -3147,7 +3256,7 @@ renderMainLayout() {
             <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; overflow: hidden;">
               <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); padding: 16px; border-bottom: 1px solid rgba(99, 102, 241, 0.2);">
                 <h2 style="margin: 0; font-size: 16px; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
-                  <span>${categoryLabels[category] || '📚 ' + category}</span>
+                  <span>${categoryLabels[category] || category}</span>
                   <span style="background: rgba(99, 102, 241, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 12px; color: #a5b4fc;">${items.length}</span>
                 </h2>
               </div>
@@ -3155,7 +3264,7 @@ renderMainLayout() {
                 ${items.map(news => `
                   <div class="news-card-item" data-news-id="${news.id}" style="background: rgba(15, 23, 42, 0.6); padding: 20px; cursor: pointer; transition: all 0.3s; border-left: 4px solid transparent;">
                     <div style="display: flex; gap: 16px; align-items: flex-start;">
-                      <div style="font-size: 32px; flex-shrink: 0;">${news.image || '📰'}</div>
+                      <div style="font-size: 32px; flex-shrink: 0;">${news.image || icons.newspaper}</div>
                       <div style="flex: 1; min-width: 0;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                           <h3 style="margin: 0; font-size: 16px; color: #e2e8f0; font-weight: 600;">${news.title}</h3>
@@ -3163,7 +3272,7 @@ renderMainLayout() {
                         </div>
                         <p style="margin: 0 0 8px 0; color: #cbd5e1; font-size: 14px; line-height: 1.5;">${news.excerpt}</p>
                         <div style="display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 12px;">
-                          <span>📅 ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                          <span style="display: inline-flex; align-items: center; gap: 6px;">${icons.calendar} ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                           ${news.category ? `<span style="background: rgba(99, 102, 241, 0.2); padding: 2px 8px; border-radius: 4px;">${categoryLabels[news.category] || news.category}</span>` : ''}
                         </div>
                       </div>
@@ -3201,9 +3310,9 @@ renderMainLayout() {
     if (microsoftBtn) {
       microsoftBtn.addEventListener('click', async () => {
         microsoftBtn.disabled = true;
-        microsoftBtn.innerHTML = '<span style="font-size: 20px;">⏳</span> Connexion en cours...';
+        microsoftBtn.textContent = 'Connexion en cours...';
         
-        const result = await ipcRenderer.invoke('login-microsoft');
+        const result = await ipcRenderer.invoke('login-microsoft', { forcePrompt: true });
         
         if (result.success) {
           this.authData = result.data;
@@ -3211,9 +3320,9 @@ renderMainLayout() {
           await this.loadData();
           this.render();
         } else {
-          alert('❌ Erreur de connexion Microsoft');
+          alert('Erreur de connexion Microsoft');
           microsoftBtn.disabled = false;
-          microsoftBtn.innerHTML = '<span style="font-size: 20px;">🪟</span> Se connecter avec Microsoft';
+          microsoftBtn.textContent = 'Se connecter avec Microsoft';
         }
       });
     }
@@ -3281,11 +3390,7 @@ renderMainLayout() {
         console.log('[Theme] Switching to:', theme);
         localStorage.setItem('theme', theme);
         this.applyThemeSelection(theme);
-        // Mettre à jour l'UI immédiatement sans re-render
-        document.querySelectorAll('.theme-option').forEach(b => {
-          const isDark = theme === 'dark';
-          b.style.borderColor = b === themeBtn ? (isDark ? '#6366f1' : '#4f46e5') : 'rgba(99, 102, 241, 0.3)';
-        });
+        this.render();
       }
 
       // ✨ THÈME - COULEUR D'ACCENT
@@ -3295,13 +3400,70 @@ renderMainLayout() {
         console.log('[Accent] Switching to:', accent);
         localStorage.setItem('accent', accent);
         this.applyAccentColor(accent);
-        // Mettre à jour l'UI
-        document.querySelectorAll('.accent-option').forEach(b => {
-          b.style.boxShadow = b === accentBtn ? '0 0 0 3px rgba(255,255,255,0.3)' : 'none';
-        });
+      }
+
+      // 🗂️ Filtrer les actualités par catégorie
+      const filterBtn = e.target.closest('[data-news-filter]');
+      if (filterBtn) {
+        this.newsCategoryFilter = filterBtn.dataset.newsFilter;
+        this.render();
       }
     };
     document.addEventListener('click', this.viewChangeListener);
+
+    document.addEventListener('change', (e) => {
+      const target = e.target;
+
+      if (target.matches('#blur-background')) {
+        const enabled = target.checked;
+        localStorage.setItem('blur-background', enabled);
+        document.documentElement.setAttribute('data-blur', enabled);
+        this.applyInterfaceOptions();
+      }
+
+      if (target.matches('#animations')) {
+        const enabled = target.checked;
+        localStorage.setItem('animations', enabled);
+        document.documentElement.setAttribute('data-animations', enabled);
+        this.applyInterfaceOptions();
+      }
+
+      if (target.matches('#transparency')) {
+        const enabled = target.checked;
+        localStorage.setItem('transparency', enabled);
+        document.documentElement.setAttribute('data-transparency', enabled);
+        this.applyInterfaceOptions();
+      }
+    });
+
+    setTimeout(() => {
+      document.querySelectorAll('.theme-option').forEach(btn => {
+        if (btn._themeListenerAdded) return;
+        btn._themeListenerAdded = true;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const theme = btn.dataset.theme;
+          if (!theme) return;
+          console.log('[Theme] Direct click handler:', theme);
+          localStorage.setItem('theme', theme);
+          this.applyThemeSelection(theme);
+          this.render();
+        });
+      });
+
+      document.querySelectorAll('.accent-option').forEach(btn => {
+        if (btn._accentListenerAdded) return;
+        btn._accentListenerAdded = true;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const accent = btn.dataset.accent;
+          if (!accent) return;
+          console.log('[Accent] Direct click handler:', accent);
+          localStorage.setItem('accent', accent);
+          this.applyAccentColor(accent);
+        });
+      });
+    }, 100);
 
     // ✨ BOUTON PARAMÈTRES DU MENU
     const openSettingsBtn = document.getElementById('open-settings-btn');
@@ -3364,7 +3526,7 @@ renderMainLayout() {
 
     // 🎮 SIGNAL QUAND LE JEU FERME
     ipcRenderer.on('game-closed', (event, { code }) => {
-      console.log(`🎮 Le jeu a fermé avec le code: ${code}`);
+      console.log(`Le jeu a fermé avec le code: ${code}`);
       const launchBtn = document.getElementById('launch-btn');
       if (launchBtn) {
         launchBtn.disabled = false;
@@ -3468,8 +3630,8 @@ renderMainLayout() {
 
     // ✅ ÉCOUTER LES ERREURS DE LANCEMENT
     this.addTrackedListener('launch-error', (event, error) => {
-      console.error('❌ Erreur lancement:', error);
-      alert('❌ ' + error);
+      console.error('Erreur lancement:', error);
+      alert(error);
     });
 
     // ✅ ÉCOUTER LES CHANGEMENTS DE PARAMÈTRES
@@ -3787,7 +3949,7 @@ renderMainLayout() {
             btn.innerHTML = `${icons.x} Serveur hors ligne`;
             btn.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
           }
-          
+
           setTimeout(() => {
             btn.disabled = false;
             btn.innerHTML = originalText;
@@ -3833,12 +3995,12 @@ renderMainLayout() {
             btn.innerHTML = originalText;
           }, 500);
         } else {
-          alert('❌ Le serveur est actuellement hors ligne');
+          alert('Le serveur est actuellement hors ligne');
           btn.disabled = false;
           btn.innerHTML = originalText;
         }
       } catch (error) {
-        alert('❌ Impossible de vérifier le serveur: ' + error.message);
+        alert('Impossible de vérifier le serveur: ' + error.message);
         btn.disabled = false;
         btn.innerHTML = originalText;
       }
@@ -4030,8 +4192,11 @@ renderMainLayout() {
   }
 
   openRadioPlayer() {
+    // ✅ Utiliser une instance globale plutôt que de recréer
     let modal = document.getElementById('radio-modal');
+    
     if (!modal) {
+      // Créer le style CSS s'il n'existe pas
       if (!document.getElementById('radio-style')) {
         const css = `
           #radio-modal{position:fixed;inset:0;background:rgba(10,15,25,.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:9999}
@@ -4072,10 +4237,14 @@ renderMainLayout() {
         style.textContent = css;
         document.head.appendChild(style);
       }
+      
+      // Récupérer les données sauvegardées
       const vol = parseFloat(localStorage.getItem('radioVolume') || '0.6');
       const stations = this.getRadioStations();
       const favs = new Set(JSON.parse(localStorage.getItem('radioFavorites') || '[]'));
       const onlyFav = localStorage.getItem('radioOnlyFav') === '1';
+      
+      // Construire le HTML
       const html = `
         <div id="radio-modal">
           <div class="radio-window">
@@ -4103,49 +4272,88 @@ renderMainLayout() {
                 <span id="radio-volume-val" style="color:#cbd5e1"></span>
               </div>
             </div>
-            <audio id="radio-audio" preload="none"></audio>
+            <audio id="radio-audio" preload="none" crossorigin="anonymous"></audio>
           </div>
         </div>
       `;
+      
       document.body.insertAdjacentHTML('beforeend', html);
       modal = document.getElementById('radio-modal');
-      const audio = document.getElementById('radio-audio');
-      const volEl = document.getElementById('radio-volume');
-      const volVal = document.getElementById('radio-volume-val');
-      const currentEl = document.getElementById('radio-current');
-      const eq = document.getElementById('radio-eq');
-      const playBtn = document.getElementById('radio-playpause');
-      const searchEl = document.getElementById('radio-search');
-      const favFilterBtn = document.getElementById('radio-fav-filter');
-      const grid = document.getElementById('radio-stations');
-      audio.volume = vol;
-      volVal.textContent = Math.round(vol*100)+'%';
-      const render = () => {
-        const q = (searchEl.value||'').toLowerCase().trim();
-        const onlyFavNow = favFilterBtn.classList.contains('active');
-        const htmlCards = stations.filter(s => (!onlyFavNow || favs.has(s.url)) && s.name.toLowerCase().includes(q)).map(s => {
-          const initials = s.name.slice(0,2).toUpperCase();
+      
+      // ✅ Initialiser les éléments une seule fois
+      this._setupRadioControls(stations, favs, vol, onlyFav);
+      
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+      });
+    } else {
+      // Si le modal existe déjà, juste le montrer
+      modal.style.display = 'flex';
+    }
+  }
+
+  /**
+   * ✅ Configurer les contrôles de la radio (logique centralisée)
+   */
+  _setupRadioControls(stations, favs, vol, onlyFav) {
+    const audio = document.getElementById('radio-audio');
+    const volEl = document.getElementById('radio-volume');
+    const volVal = document.getElementById('radio-volume-val');
+    const currentEl = document.getElementById('radio-current');
+    const eq = document.getElementById('radio-eq');
+    const playBtn = document.getElementById('radio-playpause');
+    const searchEl = document.getElementById('radio-search');
+    const favFilterBtn = document.getElementById('radio-fav-filter');
+    const grid = document.getElementById('radio-stations');
+    const closeBtn = document.getElementById('radio-close');
+    
+    if (!audio || this._radioInitialized) return; // Éviter la double initialisation
+    this._radioInitialized = true;
+
+    audio.volume = vol;
+    volVal.textContent = Math.round(vol * 100) + '%';
+
+    // ✅ Fonction de rendu
+    const render = () => {
+      const q = (searchEl?.value || '').toLowerCase().trim();
+      const onlyFavNow = favFilterBtn?.classList.contains('active');
+      const htmlCards = stations
+        .filter(s => (!onlyFavNow || favs.has(s.url)) && s.name.toLowerCase().includes(q))
+        .map(s => {
+          const initials = s.name.slice(0, 2).toUpperCase();
           const favClass = favs.has(s.url) ? 'active' : '';
           return `<div class="radio-card" data-url="${s.url}" data-name="${s.name}"><div class="radio-avatar">${initials}</div><div style="flex:1"><div class="radio-name">${s.name}</div><div class="radio-sub">Live</div></div><button class="radio-star ${favClass}" data-star="${s.url}" title="Favori">${icons.star}</button></div>`;
-        }).join('');
-        grid.innerHTML = htmlCards || `<div style="color:#94a3b8;padding:12px;">Aucune station</div>`;
-      };
-      const setSrc = (name, url) => {
-        audio.src = url;
-        currentEl.textContent = name;
-        localStorage.setItem('radioStation', JSON.stringify({ name, url }));
-        audio.play().catch(()=>{});
-        playBtn.innerHTML = icons.pause + '<span>Pause</span>';
-        eq.classList.remove('paused');
-      };
+        })
+        .join('');
+      if (grid) grid.innerHTML = htmlCards || `<div style="color:#94a3b8;padding:12px;">Aucune station</div>`;
+    };
+
+    // ✅ Fonction pour changer de station
+    const setSrc = (name, url) => {
+      audio.src = url;
+      if (currentEl) currentEl.textContent = name;
+      localStorage.setItem('radioStation', JSON.stringify({ name, url }));
+      audio.play().catch(() => {
+        console.warn('[Radio] Autoplay failed - user interaction required');
+      });
+      if (playBtn) playBtn.innerHTML = icons.pause + '<span>Pause</span>';
+      if (eq) eq.classList.remove('paused');
+    };
+
+    // Événements
+    if (grid) {
       grid.addEventListener('click', (e) => {
         const star = e.target.closest('.radio-star');
         if (star) {
           const url = star.getAttribute('data-star');
-          if (favs.has(url)) favs.delete(url); else favs.add(url);
+          if (favs.has(url)) {
+            favs.delete(url);
+          } else {
+            favs.add(url);
+          }
           localStorage.setItem('radioFavorites', JSON.stringify(Array.from(favs)));
           star.classList.toggle('active');
-          if (favFilterBtn.classList.contains('active')) render();
+          if (favFilterBtn?.classList.contains('active')) render();
           return;
         }
         const card = e.target.closest('.radio-card');
@@ -4153,48 +4361,63 @@ renderMainLayout() {
           setSrc(card.dataset.name, card.dataset.url);
         }
       });
-      searchEl.addEventListener('input', render);
+    }
+
+    if (searchEl) searchEl.addEventListener('input', render);
+    
+    if (favFilterBtn) {
       favFilterBtn.addEventListener('click', () => {
         favFilterBtn.classList.toggle('active');
         localStorage.setItem('radioOnlyFav', favFilterBtn.classList.contains('active') ? '1' : '0');
         render();
       });
+    }
+
+    if (volEl) {
       volEl.addEventListener('input', () => {
         audio.volume = parseFloat(volEl.value);
         localStorage.setItem('radioVolume', String(audio.volume));
-        volVal.textContent = Math.round(audio.volume*100)+'%';
+        if (volVal) volVal.textContent = Math.round(audio.volume * 100) + '%';
       });
+    }
+
+    if (playBtn) {
       playBtn.addEventListener('click', () => {
         if (audio.paused) {
-          audio.play().catch(()=>{});
+          audio.play().catch(() => {
+            console.warn('[Radio] Play failed');
+          });
           playBtn.innerHTML = icons.pause + '<span>Pause</span>';
-          eq.classList.remove('paused');
+          if (eq) eq.classList.remove('paused');
         } else {
           audio.pause();
           playBtn.innerHTML = icons.play + '<span>Lire</span>';
-          eq.classList.add('paused');
+          if (eq) eq.classList.add('paused');
         }
       });
-      document.getElementById('radio-close').addEventListener('click', () => {
-        modal.style.display = 'none';
-      });
-      const saved = localStorage.getItem('radioStation');
-      if (saved) {
-        try {
-          const o = JSON.parse(saved);
-          if (o && o.url) setSrc(o.name || 'Radio', o.url);
-        } catch(_) {}
-      } else if (stations[0]) {
-        setSrc(stations[0].name, stations[0].url);
-      }
-      render();
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-      });
-    } else {
-      modal.style.display = 'flex';
     }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        const modal = document.getElementById('radio-modal');
+        if (modal) modal.style.display = 'none';
+      });
+    }
+
+    // Charger la dernière station écoutée
+    const saved = localStorage.getItem('radioStation');
+    if (saved) {
+      try {
+        const o = JSON.parse(saved);
+        if (o && o.url) setSrc(o.name || 'Radio', o.url);
+      } catch (_) {}
+    } else if (stations[0]) {
+      setSrc(stations[0].name, stations[0].url);
+    }
+
+    render();
   }
+
   async launchGame(serverIP = null) {
     // ✅ PROTECTION: Éviter les doubles lancements
     if (this.isLaunching) {
@@ -4221,9 +4444,9 @@ renderMainLayout() {
     const originalText = launchBtn?.innerHTML || `${icons.zap} Lancer Minecraft`;
     if (launchBtn) {
       launchBtn.disabled = true;
-      launchBtn.innerHTML = '<span style="font-size: 20px;">⏳</span> Lancement en cours...';
+      launchBtn.textContent = 'Lancement en cours...';
     }
-
+    
     try {
       let targetServer = serverIP;
       if (!targetServer && this.settings && this.settings.defaultServer) {
@@ -4246,17 +4469,21 @@ renderMainLayout() {
           launchBtn.innerHTML = originalText;
         }
         this.isLaunching = false;
-        alert('Erreur: ' + result.error);
+        this.ui.showToast({
+          title: 'Erreur de lancement',
+          message: result.error || 'Impossible de lancer Minecraft',
+          type: 'error'
+        });
         return;
       }
 
       if (launchBtn) {
         launchBtn.disabled = true;
-        launchBtn.innerHTML = '<span style="font-size: 20px;">✓</span> Minecraft lancé !';
+        launchBtn.textContent = 'Minecraft lancé !';
         launchBtn.style.opacity = '0.6';
         launchBtn.style.cursor = 'not-allowed';
       }
-      this.isLaunching = true; // Garder cet état pour empêcher les doubles clics
+      
       this.ui.showToast({
         title: 'Minecraft lancé',
         message: targetServer ? `Connexion à ${targetServer} en cours.` : 'Le jeu a bien été démarré.',
@@ -4274,11 +4501,14 @@ renderMainLayout() {
         launchBtn.style.cursor = 'pointer';
       }
       this.isLaunching = false;
-      alert('Erreur: ' + error.message);
+      this.ui.showToast({
+        title: 'Erreur',
+        message: error?.message || 'Erreur lors du lancement',
+        type: 'error'
+      });
     }
   }
 
-  // ✨ NOUVELLES VUES
 
   async renderStatsView() {
     const html = await this.features.renderGameStats();
@@ -4293,7 +4523,7 @@ renderMainLayout() {
     return `
       <div class="view-container" style="display: flex; align-items: center; justify-content: center; min-height: 600px; position: relative; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); border-radius: 16px;">
         <div style="text-align: center; color: #e2e8f0;">
-          <div style="font-size: 64px; margin-bottom: 20px; animation: float 3s ease-in-out infinite;">🚀</div>
+          <div style="font-size: 64px; margin-bottom: 20px; animation: float 3s ease-in-out infinite;">${icons.rocket}</div>
           <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">Fonctionnalité à venir !</h2>
           <p style="color: #94a3b8; font-size: 16px; max-width: 400px; margin: 0 auto;">
             Cette fonctionnalité arrivera très bientôt. Restez connecté pour les dernières actualités !
@@ -4475,82 +4705,24 @@ renderMainLayout() {
 
   // ✅ SYSTÈME DE THÈME PERSONNALISÉ
   loadTheme() {
-    const savedTheme = localStorage.getItem('VellkoraMC-theme') || 'normal';
-    const savedCustom = localStorage.getItem('VellkoraMC-custom-theme');
-    
-    this.theme = savedTheme;
-    if (savedCustom) {
-      this.customTheme = JSON.parse(savedCustom);
-    }
-    
-    this.applyTheme();
-  }
-
-  reapplyTheme() {
-    // Charger et réappliquer le thème light/dark sauvegardé
     const theme = localStorage.getItem('theme') || 'dark';
     const accent = localStorage.getItem('accent') || 'indigo';
-    
     this.applyThemeSelection(theme);
     this.applyAccentColor(accent);
   }
 
+  reapplyTheme() {
+    this.loadTheme();
+  }
+
   applyTheme() {
-    const root = document.documentElement;
-    let colors;
-
-    switch (this.theme) {
-      case 'blanc':
-        colors = {
-          primary: '#4f46e5',
-          secondary: '#7c3aed',
-          background: '#ffffff',
-          text: '#1e293b',
-          accent: '#06b6d4'
-        };
-        break;
-      case 'noir':
-        colors = {
-          primary: '#6366f1',
-          secondary: '#8b5cf6',
-          background: '#000000',
-          text: '#ffffff',
-          accent: '#10b981'
-        };
-        break;
-      case 'custom':
-        colors = {
-          primary: this.customTheme.primaryColor,
-          secondary: this.customTheme.secondaryColor,
-          background: this.customTheme.backgroundColor,
-          text: this.customTheme.textColor,
-          accent: this.customTheme.accentColor
-        };
-        break;
-      case 'normal':
-      default:
-        colors = {
-          primary: '#6366f1',
-          secondary: '#8b5cf6',
-          background: '#0f172a',
-          text: '#e2e8f0',
-          accent: '#10b981'
-        };
-    }
-
-    root.style.setProperty('--color-primary', colors.primary);
-    root.style.setProperty('--color-secondary', colors.secondary);
-    root.style.setProperty('--color-background', colors.background);
-    root.style.setProperty('--color-text', colors.text);
-    root.style.setProperty('--color-accent', colors.accent);
-
-    document.body.style.background = colors.background;
-    document.body.style.color = colors.text;
+    this.loadTheme();
   }
 
   saveTheme() {
-    localStorage.setItem('VellkoraMC-theme', this.theme);
-    if (this.theme === 'custom') {
+    const theme = this.theme || localStorage.getItem('theme') || 'dark';
+    localStorage.setItem('theme', theme);
+    if (this.theme === 'custom' && this.customTheme) {
       localStorage.setItem('VellkoraMC-custom-theme', JSON.stringify(this.customTheme));
     }
   }
@@ -4561,13 +4733,13 @@ renderMainLayout() {
       const result = await ipcRenderer.invoke('get-featured-news');
       if (result.success) {
         this.news = result.news;
-        console.log(`📰 ${this.news.length} actualités chargées`);
+        console.log(`Actualités chargées: ${this.news.length}`);
       } else {
         console.warn('⚠️ Impossible de charger les actualités');
         this.news = [];
       }
     } catch (error) {
-      console.error('❌ Erreur chargement actualités:', error);
+      console.error('Erreur chargement actualités:', error);
       this.news = [];
     }
   }
@@ -4583,7 +4755,7 @@ renderMainLayout() {
             <div style="background: #0f172a; border-radius: 16px; max-width: 800px; max-height: 90vh; overflow-y: auto; border: 1px solid rgba(99, 102, 241, 0.2); position: relative; animation: slideUp 0.3s;" onclick="event.stopPropagation()">
               <div style="position: sticky; top: 0; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); padding: 20px; border-bottom: 1px solid rgba(99, 102, 241, 0.2); display: flex; align-items: center; justify-content: space-between;">
                 <h2 style="margin: 0; color: #e2e8f0; display: flex; align-items: center; gap: 12px;">
-                  <span style="font-size: 28px;">${news.image || '📰'}</span>
+                  <span style="font-size: 28px;">${news.image || icons.newspaper}</span>
                   ${news.title}
                 </h2>
                 <button style="background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.3); color: #cbd5e1; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 20px; transition: all 0.3s;" onclick="document.getElementById('news-modal').remove()">×</button>
@@ -4592,8 +4764,8 @@ renderMainLayout() {
               <div style="padding: 24px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid rgba(99, 102, 241, 0.1);">
                   <div>
-                    <div style="color: #cbd5e1; font-size: 14px;">
-                      📅 ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    <div style="color: #cbd5e1; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+                      ${icons.calendar} ${new Date(news.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                   <div style="display: flex; gap: 8px;">
@@ -4610,7 +4782,7 @@ renderMainLayout() {
 
                 <div style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: 8px; border-left: 4px solid rgba(99, 102, 241, 0.3);">
                   <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                    ℹ️ Pour plus d'informations, consultez nos réseaux sociaux ou notre site officiel.
+                    Pour plus d'informations, consultez nos réseaux sociaux ou notre site officiel.
                   </p>
                 </div>
               </div>
@@ -4657,213 +4829,317 @@ renderMainLayout() {
         console.log(`📰 Actualité ouverte: ${news.title}`);
       }
     } catch (error) {
-      console.error('❌ Erreur affichage détail actualité:', error);
+      console.error('Erreur affichage détail actualité:', error);
     }
   }
 
   applyThemeSelection(theme) {
     const root = document.documentElement;
-    
-    console.log('[Theme] Applying theme:', theme);
-    localStorage.setItem('theme', theme);
-    
-    // Ajouter/retirer le style global pour les couleurs
+    const selectedTheme = String(theme || 'dark');
+    const preset = this.themePresets[selectedTheme] || this.themePresets.dark;
+
+    console.log('[Theme] Applying theme:', selectedTheme);
+    localStorage.setItem('theme', selectedTheme);
+
+    root.style.setProperty('--theme-background', preset.background);
+    root.style.setProperty('--theme-surface', preset.surface);
+    root.style.setProperty('--theme-panel', preset.panel);
+    root.style.setProperty('--theme-text', preset.text);
+    root.style.setProperty('--theme-muted', preset.muted);
+    root.style.setProperty('--theme-border', preset.border);
+    root.style.setProperty('--theme-hero', preset.hero);
+    root.style.setProperty('--theme-accent', preset.accent);
+
+    document.body.style.background = preset.background;
+    document.body.style.color = preset.text;
+
     let styleId = 'theme-dynamic-styles';
     let existingStyle = document.getElementById(styleId);
     if (existingStyle) existingStyle.remove();
-    
+
     const styleEl = document.createElement('style');
     styleEl.id = styleId;
-    
-    if (theme === 'light') {
-      styleEl.textContent = `
-        * { color: #000000 !important; }
-        .brand-user { color: #000000 !important; }
-        .menu-item { color: #000000 !important; }
-        .view-title { color: #000000 !important; }
-        h1, h2, h3, h4, h5, h6 { color: #000000 !important; }
-        p, span, div, label { color: #000000 !important; }
-      `;
-    }
+    styleEl.textContent = `
+      body { background: ${preset.background}; color: ${preset.text}; }
+      .main-layout { background: ${preset.background}; color: ${preset.text}; }
+      .sidebar { background: ${preset.panel}; color: ${preset.text}; }
+      .main-content { background: ${preset.background}; color: ${preset.text}; }
+      .view-title, .menu-item, h1, h2, h3, h4, h5, h6, p, span, label { color: ${preset.text} !important; }
+      .menu-item:hover { color: ${preset.accent} !important; }
+      .panel-card, .news-card-item, .theme-card, .settings-card { background: ${preset.panel}; border-color: ${preset.border}; }
+      .news-filter-pill { background: rgba(255,255,255,0.06); color: ${preset.text}; }
+      .news-filter-pill.active { background: ${preset.accent}; color: #ffffff; }
+      .theme-option.active, .accent-option.active { box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+      .accent-option { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+      .accent-option:hover { transform: translateY(-1px); }
+    `;
     document.head.appendChild(styleEl);
-    
-    // Appliquer sur body et document
-    if (theme === 'dark') {
-      document.body.style.background = '#0f172a';
-      document.body.style.color = '#e2e8f0';
-    } else if (theme === 'light') {
-      document.body.style.background = '#f1f5f9';
-      document.body.style.color = '#000000';
-    }
-    
-    // Appliquer aussi sur .main-layout, .sidebar, .main-content
-    const mainLayout = document.querySelector('.main-layout');
-    const sidebar = document.querySelector('.sidebar');
-    const mainContent = document.querySelector('.main-content');
-    
-    if (mainLayout) {
-      if (theme === 'dark') {
-        mainLayout.style.background = '#0f172a';
-        mainLayout.style.color = '#e2e8f0';
-      } else {
-        mainLayout.style.background = '#f1f5f9';
-        mainLayout.style.color = '#000000';
-      }
-    }
-    
-    if (sidebar) {
-      if (theme === 'dark') {
-        sidebar.style.background = 'rgba(15, 23, 42, 0.8)';
-        sidebar.style.color = '#e2e8f0';
-      } else {
-        sidebar.style.background = 'rgba(241, 245, 249, 0.9)';
-        sidebar.style.color = '#000000';
-      }
-    }
-    
-    if (mainContent) {
-      if (theme === 'dark') {
-        mainContent.style.background = '#0f172a';
-      } else {
-        mainContent.style.background = '#f1f5f9';
-      }
-    }
+    this.applyInterfaceOptions();
   }
 
   applyAccentColor(accent) {
     const root = document.documentElement;
-    const colors = {
-      indigo: '#6366f1',
-      purple: '#a855f7',
-      blue: '#3b82f6',
-      cyan: '#06b6d4'
-    };
-    
-    const accentColor = colors[accent];
-    
+    const accentColor = this.accentColors[accent] || this.accentColors.indigo;
+
     console.log('[Accent] Applying accent:', accent, accentColor);
     localStorage.setItem('accent', accent);
-    
-    // Mettre à jour la variable CSS
-    root.style.setProperty('--color-accent', accentColor);
-    
-    // Mettre à jour TOUS les éléments avec l'accent
+
+    root.style.setProperty('--theme-accent', accentColor);
+
     document.querySelectorAll('.btn-primary').forEach(el => {
       el.style.background = accentColor;
     });
-    
+
     document.querySelectorAll('.accent-option').forEach(el => {
       if (el.dataset.accent === accent) {
+        el.classList.add('active');
         el.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.3)';
       } else {
+        el.classList.remove('active');
         el.style.boxShadow = 'none';
       }
     });
-    
+
+    document.querySelectorAll('.theme-option').forEach(el => {
+      if (el.dataset.theme === localStorage.getItem('theme')) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+
     document.querySelectorAll('.menu-item.active').forEach(el => {
       el.style.color = accentColor;
     });
-    
+
     document.querySelectorAll('a').forEach(el => {
       el.style.color = accentColor;
     });
-    
-    // Ajouter/retirer le style global pour les accents
+
     let styleId = 'accent-dynamic-styles';
     let existingStyle = document.getElementById(styleId);
     if (existingStyle) existingStyle.remove();
-    
+
     const styleEl = document.createElement('style');
     styleEl.id = styleId;
     styleEl.textContent = `
       .btn-primary { background: ${accentColor} !important; }
       .btn-secondary:hover { border-color: ${accentColor} !important; color: ${accentColor} !important; }
-      .accent-option[data-accent="${accent}"] { box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important; }
+      .accent-option.active, .accent-option[data-accent="${accent}"] { box-shadow: 0 0 0 3px rgba(255,255,255,0.3) !important; }
+      .theme-option.active { border-color: ${accentColor} !important; }
       .menu-item.active { color: ${accentColor} !important; }
       a { color: ${accentColor} !important; }
       .view-title { color: ${accentColor} !important; }
+      .news-filter-pill.active { background: ${accentColor} !important; }
     `;
     document.head.appendChild(styleEl);
+    this.applyInterfaceOptions();
   }
 
   renderThemeSettings() {
     const currentTheme = localStorage.getItem('theme') || 'dark';
     const currentAccent = localStorage.getItem('accent') || 'indigo';
+    const themeOptions = [
+      { id: 'dark', icon: icons.moon, title: 'Sombre', subtitle: 'Foncé et élégant' },
+      { id: 'neon', icon: icons.zap, title: 'Neon', subtitle: 'Vif et électrique' },
+      { id: 'metro', icon: icons.settings, title: 'Metro', subtitle: 'Futuriste et net' }
+    ];
+
+    const accentLabel = {
+      indigo: 'Indigo',
+      purple: 'Violet',
+      blue: 'Bleu',
+      cyan: 'Cyan',
+      emerald: 'Émeraude'
+    };
+    const accentOptions = Object.entries(this.accentColors).map(([name, color]) => ({ name, color, label: accentLabel[name] || name }));
 
     return `
       <div class="view-container">
         <div class="view-header">
           <h1>Thème et apparence</h1>
+          <p style="margin-top: 10px; color: #94a3b8; max-width: 800px;">Choisis un look pro, des accents puissants et un système de thème plus riche pour améliorer l'apparence de l'ensemble du launcher.</p>
         </div>
 
-        <div style="max-width: 800px; margin: 0 auto;">
-          <!-- Thème Clair/Sombre -->
-          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <h3 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 18px;">Mode d'affichage</h3>
-            
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-              <!-- Mode Sombre (Défaut) -->
-              <button class="theme-option" data-theme="dark" style="background: rgba(15, 23, 42, 0.8); border: 2px solid ${currentTheme === 'dark' ? '#6366f1' : 'rgba(99, 102, 241, 0.3)'}; border-radius: 10px; padding: 20px; cursor: pointer; text-align: center; color: #e2e8f0; transition: all 0.3s; font-weight: 600;">
-                <div style="font-size: 32px; margin-bottom: 8px;">🌙</div>
-                <div>Mode sombre</div>
-                <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">Défaut</div>
-              </button>
+        <div style="max-width: 920px; margin: 0 auto; display: grid; gap: 22px;">
+          <div style="background: rgba(30, 41, 59, 0.88); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 18px; padding: 26px; box-shadow: 0 18px 40px rgba(0,0,0,0.18);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <div>
+                <h2 style="margin: 0 0 8px 0; color: #e2e8f0; font-size: 22px;">Mode de thème</h2>
+                <p style="margin: 0; color: #cbd5e1; line-height: 1.6;">Sélectionne un style de base et optimise ton launcher avec un rendu plus soigné, des surbrillances et un contraste net.</p>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <span style="color: #94a3b8; font-size: 13px; white-space: nowrap;">Thème actuel:</span>
+                <span style="background: rgba(99, 102, 241, 0.18); color: #e0e7ff; padding: 8px 14px; border-radius: 999px; font-weight: 600;">${themeOptions.find(theme => theme.id === currentTheme)?.title || 'Sombre'}</span>
+              </div>
+            </div>
 
-              <!-- Mode Clair -->
-              <button class="theme-option" data-theme="light" style="background: rgba(241, 245, 249, 0.8); border: 2px solid ${currentTheme === 'light' ? '#4f46e5' : 'rgba(99, 102, 241, 0.3)'}; border-radius: 10px; padding: 20px; cursor: pointer; text-align: center; color: #1e293b; transition: all 0.3s; font-weight: 600;">
-                <div style="font-size: 32px; margin-bottom: 8px;">☀️</div>
-                <div>Mode clair</div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Thème light</div>
-              </button>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 20px;">
+              ${themeOptions.map(theme => `
+                <button class="theme-option${currentTheme === theme.id ? ' active' : ''}" data-theme="${theme.id}" type="button" style="background: rgba(15, 23, 42, 0.88); border: 2px solid ${currentTheme === theme.id ? '#6366f1' : 'rgba(99, 102, 241, 0.2)'}; border-radius: 16px; padding: 18px; cursor: pointer; text-align: left; color: #e2e8f0; transition: all 0.25s ease;">
+                  <div style="font-size: 28px; margin-bottom: 12px;">${theme.icon}</div>
+                  <div style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">${theme.title}</div>
+                  <div style="font-size: 13px; color: #94a3b8; line-height: 1.5;">${theme.subtitle}</div>
+                </button>
+              `).join('')}
             </div>
           </div>
 
-          <!-- Accents de couleur -->
-          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <h3 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 18px;">Couleur d'accent</h3>
-            
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-              <button class="accent-option" data-accent="indigo" style="background: #6366f1; border: 2px solid #6366f1; border-radius: 10px; padding: 24px; cursor: pointer; transition: all 0.3s; color: white; font-weight: 600; font-size: 14px; ${currentAccent === 'indigo' ? 'box-shadow: 0 0 0 3px rgba(255,255,255,0.3);' : ''}">
-                Indigo
-              </button>
-              <button class="accent-option" data-accent="purple" style="background: #a855f7; border: 2px solid #a855f7; border-radius: 10px; padding: 24px; cursor: pointer; transition: all 0.3s; color: white; font-weight: 600; font-size: 14px; ${currentAccent === 'purple' ? 'box-shadow: 0 0 0 3px rgba(255,255,255,0.3);' : ''}">
-                Violet
-              </button>
-              <button class="accent-option" data-accent="blue" style="background: #3b82f6; border: 2px solid #3b82f6; border-radius: 10px; padding: 24px; cursor: pointer; transition: all 0.3s; color: white; font-weight: 600; font-size: 14px; ${currentAccent === 'blue' ? 'box-shadow: 0 0 0 3px rgba(255,255,255,0.3);' : ''}">
-                Bleu
-              </button>
-              <button class="accent-option" data-accent="cyan" style="background: #06b6d4; border: 2px solid #06b6d4; border-radius: 10px; padding: 24px; cursor: pointer; transition: all 0.3s; color: white; font-weight: 600; font-size: 14px; ${currentAccent === 'cyan' ? 'box-shadow: 0 0 0 3px rgba(255,255,255,0.3);' : ''}">
-                Cyan
-              </button>
+          <div style="background: rgba(30, 41, 59, 0.88); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 18px; padding: 26px;">
+            <h2 style="margin: 0 0 14px 0; color: #e2e8f0; font-size: 20px;">Couleurs d'accent</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px;">
+              ${accentOptions.map(option => `
+                <button class="accent-option${currentAccent === option.name ? ' active' : ''}" data-accent="${option.name}" type="button" style="display: flex; align-items: center; justify-content: center; gap: 10px; background: ${option.color}; border: 2px solid ${option.color}; border-radius: 16px; padding: 18px; color: white; font-weight: 700; cursor: pointer; transition: all 0.2s ease;">
+                  <span style="width: 14px; height: 14px; border-radius: 999px; display: inline-block; background: rgba(255,255,255,0.3);"></span>
+                  ${option.label}
+                </button>
+              `).join('')}
             </div>
           </div>
 
-          <!-- Options supplémentaires -->
-          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 24px;">
-            <h3 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 18px;">Options</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; color: #e2e8f0;">
+          <div style="background: rgba(30, 41, 59, 0.88); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 18px; padding: 26px;">
+            <h2 style="margin: 0 0 14px 0; color: #e2e8f0; font-size: 20px;">Options d'interface</h2>
+            <p style="color: #94a3b8; margin-bottom: 18px;">Active les effets visuels, la transparence, et donne plus de caractère à ton launcher sans perdre en lisibilité.</p>
+            <div style="display: grid; gap: 14px;">
+              <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #e2e8f0; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(99, 102, 241, 0.12); border-radius: 14px; padding: 16px;">
+                <span>Activer le flou d'arrière-plan</span>
                 <input type="checkbox" id="blur-background" ${localStorage.getItem('blur-background') !== 'false' ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-                <span>Activer le blur en arrière-plan</span>
               </label>
-              
-              <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; color: #e2e8f0;">
-                <input type="checkbox" id="animations" ${localStorage.getItem('animations') !== 'false' ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+              <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #e2e8f0; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(99, 102, 241, 0.12); border-radius: 14px; padding: 16px;">
                 <span>Activer les animations</span>
+                <input type="checkbox" id="animations" ${localStorage.getItem('animations') !== 'false' ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
               </label>
-
-              <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; color: #e2e8f0;">
-                <input type="checkbox" id="transparency" ${localStorage.getItem('transparency') !== 'false' ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+              <label style="display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #e2e8f0; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(99, 102, 241, 0.12); border-radius: 14px; padding: 16px;">
                 <span>Activer la transparence</span>
+                <input type="checkbox" id="transparency" ${localStorage.getItem('transparency') !== 'false' ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
               </label>
+            </div>
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(99, 102, 241, 0.12); border-radius: 18px; padding: 28px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);">
+            <h2 style="margin: 0 0 16px 0; color: #e2e8f0; font-size: 20px;">Aperçu du thème</h2>
+            <div style="display: grid; gap: 14px;">
+              <div style="background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(99, 102, 241, 0.18); border-radius: 16px; padding: 20px;">
+                <div style="font-size: 16px; font-weight: 700; color: #e2e8f0; margin-bottom: 10px;">Aperçu du launcher</div>
+                <div style="color: #94a3b8; font-size: 14px; line-height: 1.6;">Ton thème se mettra à jour immédiatement pour toutes les pages. Les accents et les sections sont stylés avec une apparence plus moderne et des reflets dynamiques.</div>
+                <button class="btn-primary" style="margin-top: 18px; width: fit-content;">Tester l'accent</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     `;
   }
+
+  applyInterfaceOptions() {
+    const root = document.documentElement;
+    const blurEnabled = localStorage.getItem('blur-background') !== 'false';
+    const animationsEnabled = localStorage.getItem('animations') !== 'false';
+    const transparencyEnabled = localStorage.getItem('transparency') !== 'false';
+
+    root.setAttribute('data-blur', blurEnabled);
+    root.setAttribute('data-animations', animationsEnabled);
+    root.setAttribute('data-transparency', transparencyEnabled);
+
+    let styleId = 'interface-option-styles';
+    let existingStyle = document.getElementById(styleId);
+    if (existingStyle) existingStyle.remove();
+
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      :root[data-blur="true"] .panel-card,
+      :root[data-blur="true"] .settings-card,
+      :root[data-blur="true"] .news-card-item,
+      :root[data-blur="true"] .theme-card,
+      :root[data-blur="true"] .main-layout,
+      :root[data-blur="true"] .sidebar,
+      :root[data-blur="true"] .main-content {
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+
+      :root[data-transparency="true"] .panel-card,
+      :root[data-transparency="true"] .settings-card,
+      :root[data-transparency="true"] .news-card-item,
+      :root[data-transparency="true"] .theme-card,
+      :root[data-transparency="true"] .main-layout,
+      :root[data-transparency="true"] .sidebar,
+      :root[data-transparency="true"] .main-content {
+        background: rgba(15, 23, 42, 0.72) !important;
+        border-color: rgba(99, 102, 241, 0.12) !important;
+      }
+
+      :root[data-animations="false"] *,
+      :root[data-animations="false"] *::before,
+      :root[data-animations="false"] *::after {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        animation-play-state: paused !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
+
+let notificationAudioContext = null;
+function playNotificationSound(volume = 0.5) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    if (!notificationAudioContext) {
+      notificationAudioContext = new AudioContext();
+    }
+
+    const oscillator = notificationAudioContext.createOscillator();
+    const gainNode = notificationAudioContext.createGain();
+    gainNode.gain.value = Math.max(0, Math.min(volume, 1)) * 0.25;
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    oscillator.connect(gainNode);
+    gainNode.connect(notificationAudioContext.destination);
+    oscillator.start();
+    oscillator.stop(notificationAudioContext.currentTime + 0.12);
+    oscillator.onended = () => {
+      try { oscillator.disconnect(); gainNode.disconnect(); } catch (_) {}
+    };
+  } catch (error) {
+    console.warn('Unable to play notification sound:', error);
+  }
+}
+
+ipcRenderer.on('theme-updated', (event, themeData = {}) => {
+  const { theme, accent, blur, animations, transparency } = themeData;
+  if (theme) {
+    localStorage.setItem('theme', theme);
+    if (window.app && typeof window.app.applyThemeSelection === 'function') {
+      window.app.applyThemeSelection(theme);
+    }
+  }
+  if (accent) {
+    localStorage.setItem('accent', accent);
+    if (window.app && typeof window.app.applyAccentColor === 'function') {
+      window.app.applyAccentColor(accent);
+    }
+  }
+  if (typeof blur !== 'undefined') {
+    localStorage.setItem('blur-background', blur);
+    document.documentElement.setAttribute('data-blur', blur);
+  }
+  if (typeof animations !== 'undefined') {
+    localStorage.setItem('animations', animations);
+    document.documentElement.setAttribute('data-animations', animations);
+  }
+  if (typeof transparency !== 'undefined') {
+    localStorage.setItem('transparency', transparency);
+    document.documentElement.setAttribute('data-transparency', transparency);
+  }
+});
+
+ipcRenderer.on('play-notification-sound', (event, { volume = 0.5 } = {}) => {
+  playNotificationSound(volume);
+});
 
 document.addEventListener('DOMContentLoaded', () => {
   window.app = new CraftLauncherApp();

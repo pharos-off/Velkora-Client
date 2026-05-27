@@ -5,11 +5,14 @@ const path = require('path');
 const crypto = require('crypto');
 
 class MicrosoftAuth {
-  constructor() {
+  constructor(storeInstance) {
     this.clientId = '00000000-0000-0000-0000-0000402b5328';
     this.redirectUri = 'https://login.live.com/oauth20_desktop.srf';
-    this.store = new Store();
+    // ✅ Utiliser le store passé en paramètre ou créer un nouveau (fallback)
+    this.store = storeInstance || new Store();
     this.tokenCache = this.store.get('authData', null);
+    console.log('🔐 [MicrosoftAuth Constructor] Store initialized');
+    console.log('🔐 [MicrosoftAuth Constructor] Cached authData:', this.tokenCache ? `${this.tokenCache.username} (${this.tokenCache.uuid})` : 'NULL');
     this.authInProgress = false;
     this.authWindow = null;
     this.authPromise = null;
@@ -18,7 +21,8 @@ class MicrosoftAuth {
   /**
    * ✅ AUTHENTIFICATION PRINCIPALE - RÉSILIENTE ET ROBUSTE
    */
-  async authenticate() {
+  async authenticate(forcePrompt = false) {
+    console.log('🔐 [authenticate()] Starting - forcePrompt:', forcePrompt);
     if (this.authWindow && !this.authWindow.isDestroyed()) {
       console.log('⚠️ Une fenêtre d\'authentification existe déjà');
       this.authWindow.focus();
@@ -32,9 +36,25 @@ class MicrosoftAuth {
 
     this.authInProgress = true;
 
-    this.authPromise = new Promise((resolve) => {
+    this.authPromise = new Promise(async (resolve) => {
       try {
+        console.log('🔐 [authenticate()] Creating auth session with persist:auth partition');
         const authSession = session.fromPartition('persist:auth');
+        console.log('🔐 [authenticate()] Auth session created');
+
+        if (forcePrompt) {
+          console.log('🔐 [authenticate()] forcePrompt=true, clearing storage...');
+          try {
+            await authSession.clearStorageData({
+              storages: ['cookies', 'localstorage', 'sessionstorage']
+            });
+            console.log('✅ [authenticate()] Storage cleared');
+          } catch (error) {
+            console.warn('⚠️ Impossible de vider la session d\'authentification :', error.message);
+          }
+        } else {
+          console.log('🔐 [authenticate()] forcePrompt=false, keeping existing session/cookies');
+        }
 
         this.authWindow = new BrowserWindow({
           width: 600,
@@ -61,7 +81,7 @@ class MicrosoftAuth {
           `&scope=XboxLive.signin%20offline_access` +
           `&prompt=select_account`;
 
-        console.log('🔐 Starting Microsoft authentication...');
+        console.log('🔐 [authenticate()] Loading Microsoft auth URL:', authUrl);
         this.authWindow.loadURL(authUrl);
 
         let isProcessing = false;
@@ -214,14 +234,28 @@ class MicrosoftAuth {
         uuid: profile.id, // 32 chars sans tirets (normal via API)
         accessToken: mc.access_token, // ✅ token Minecraft services
         refreshToken: tokens.refresh_token,
-        // ✅ expiration du token Minecraft (pas Microsoft)
-        expiresAt: Date.now() + ((mc.expires_in || 0) * 1000),
+        // ✅ expiration du token Minecraft (fallback 24h si expires_in manquant)
+        expiresAt: Date.now() + ((mc.expires_in || 24 * 3600) * 1000),
         clientToken, // ✅ stable
         profile: profile,
         connectedAt: new Date().toISOString()
       };
 
+      console.log('💾 [completeAuthFlow] SAVING authData to store:');
+      console.log('   - username:', authData.username);
+      console.log('   - uuid:', authData.uuid);
+      console.log('   - accessToken:', authData.accessToken.substring(0, 20) + '...');
+      console.log('   - refreshToken:', authData.refreshToken ? authData.refreshToken.substring(0, 20) + '...' : 'NULL');
+      console.log('   - expiresAt:', new Date(authData.expiresAt).toISOString());
+      console.log('   - clientToken:', authData.clientToken);
+
       this.store.set('authData', authData);
+      console.log('✅ [completeAuthFlow] authData saved to store');
+      
+      // Vérifier que c'est bien sauvegardé
+      const verify = this.store.get('authData');
+      console.log('✅ [completeAuthFlow] VERIFICATION - authData retrieved from store:', verify ? `${verify.username} (${verify.uuid})` : 'NULL');
+      
       this.tokenCache = authData;
 
       console.log('🎉 Authentication successful!');
@@ -315,8 +349,11 @@ class MicrosoftAuth {
       const data = await response.json();
 
       if (!response.ok || !data.access_token) {
-        console.error('❌ Refresh failed:', data.error);
-        this.store.delete('authData');
+        console.error('❌ Refresh failed:', data.error, data.error_description || '');
+        const invalidGrant = ['invalid_grant', 'invalid_request', 'invalid_token', 'interaction_required'];
+        if (data.error && invalidGrant.includes(data.error)) {
+          this.store.delete('authData');
+        }
         return null;
       }
 
@@ -342,7 +379,7 @@ class MicrosoftAuth {
       // ✅ METTRE À JOUR LES DONNÉES
       authData.accessToken = mc.access_token;
       authData.refreshToken = data.refresh_token || authData.refreshToken;
-      authData.expiresAt = Date.now() + ((mc.expires_in || 0) * 1000);
+      authData.expiresAt = Date.now() + ((mc.expires_in || 24 * 3600) * 1000);  // Fallback 24h
 
       // clientToken stable
       if (!authData.clientToken) authData.clientToken = crypto.randomUUID();
@@ -355,7 +392,6 @@ class MicrosoftAuth {
 
     } catch (error) {
       console.error('❌ Erreur refresh token:', error.message);
-      this.store.delete('authData');
       return null;
     }
   }
@@ -371,14 +407,26 @@ class MicrosoftAuth {
       return null;
     }
 
-    // Si le tokend expire ou ne contient pas de valeur, on refresh
-    if (!authData.accessToken || (authData.expiresAt && Date.now() > (authData.expiresAt - 5 * 60 * 1000))) {
+    const now = Date.now();
+    const expiresAt = authData.expiresAt || 0;
+    const isExpired = expiresAt && now >= expiresAt;
+    const isNearExpiry = expiresAt && (expiresAt - now <= 5 * 60 * 1000);
+
+    // Si le token a expiré, on doit tenter un refresh.
+    if (!authData.accessToken || isExpired || isNearExpiry) {
       console.log('⏰ Token expiration approaching / token manquant, refreshing...');
       const refreshed = await this.refreshAccessToken();
       if (refreshed) {
         this.tokenCache = this.store.get('authData');
         return refreshed;
       }
+
+      // Si le refresh échoue mais que le token actuel est encore valide, on l'utilise.
+      if (authData.accessToken && !isExpired) {
+        console.warn('⚠️ Refresh failed but current token is still valid, keeping existing session');
+        return authData.accessToken;
+      }
+
       return null;
     }
 

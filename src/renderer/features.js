@@ -109,7 +109,7 @@ class LauncherFeatures {
           </div>
 
           <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 14px; padding: 24px;">
-            <h3 style="color: #e2e8f0; margin-bottom: 16px; font-size: 15px; font-weight: 600;">🔥 Statistiques avancées</h3>
+            <h3 style="color: #e2e8f0; margin-bottom: 16px; font-size: 15px; font-weight: 600;">Statistiques avancées</h3>
             <div style="display: flex; flex-direction: column; gap: 12px;">
               <div style="background: rgba(15, 23, 42, 0.5); padding: 12px 16px; border-radius: 8px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">

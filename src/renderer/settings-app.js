@@ -6,6 +6,36 @@ const { icons: lucideIcons } = require('./lucide-icons.js');
 let originalSettings = {};
 let currentSettings = {};
 const ui = new UIFeedback({ namespace: 'settings-ui' });
+let notificationAudioContext = null;
+
+function playNotificationSound(volume = 0.5) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    if (!notificationAudioContext) {
+      notificationAudioContext = new AudioContext();
+    }
+
+    const oscillator = notificationAudioContext.createOscillator();
+    const gainNode = notificationAudioContext.createGain();
+    gainNode.gain.value = Math.max(0, Math.min(volume, 1)) * 0.25;
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    oscillator.connect(gainNode);
+    gainNode.connect(notificationAudioContext.destination);
+    oscillator.start();
+    oscillator.stop(notificationAudioContext.currentTime + 0.12);
+    oscillator.onended = () => {
+      try { oscillator.disconnect(); gainNode.disconnect(); } catch (_) {}
+    };
+  } catch (error) {
+    console.warn('Unable to play notification sound:', error);
+  }
+}
+
+ipcRenderer.on('play-notification-sound', (event, { volume = 0.5 } = {}) => {
+  playNotificationSound(volume);
+});
 
 function installAlertBridge() {
   window.alert = (message) => {
@@ -87,6 +117,12 @@ async function loadSettings() {
       if (ramValue) ramValue.textContent = `${ramSlider.value} GB`;
       if (ramHelpText) ramHelpText.textContent = `Allocate between 1 and ${systemRam} GB for Minecraft`;
     }
+
+    // ✅ Charger les paramètres de mise à jour
+    const checkUpdateStartupToggle = document.getElementById('check-update-startup-toggle');
+    const autoUpdateToggle = document.getElementById('auto-update-toggle');
+    if (checkUpdateStartupToggle) checkUpdateStartupToggle.checked = settings.checkUpdateOnStartup !== false;
+    if (autoUpdateToggle) autoUpdateToggle.checked = settings.autoUpdate !== false;
   } catch (error) {
     console.error('Erreur chargement parametres:', error);
   }
@@ -102,9 +138,9 @@ async function loadAccountInfo() {
     if (accountInfo && accountInfo.username) {
       if (accountNameEl) accountNameEl.textContent = accountInfo.username;
       if (accountEmailEl) accountEmailEl.textContent = accountInfo.id || accountInfo.uuid || 'N/A';
-      if (accountStatusEl) accountStatusEl.innerHTML = '<span style="color: #10b981;">✓ En ligne</span>';
+      if (accountStatusEl) accountStatusEl.innerHTML = '<span style="color: #10b981;">En ligne</span>';
     } else {
-      if (accountStatusEl) accountStatusEl.innerHTML = '<span style="color: #ef4444;">✗ Pas connecte</span>';
+      if (accountStatusEl) accountStatusEl.innerHTML = '<span style="color: #ef4444;">Pas connecté</span>';
     }
   } catch (error) {
     console.error('Erreur chargement compte:', error);
@@ -210,9 +246,9 @@ async function loadDiscordSettings() {
       // Mettre à jour le statut de la connexion
       if (connectionStatusEl) {
         if (discordSettings.isConnected) {
-          connectionStatusEl.innerHTML = '<span style="color: #10b981;">✓ Connecte</span>';
+          connectionStatusEl.innerHTML = '<span style="color: #10b981;">Connecté</span>';
         } else {
-          connectionStatusEl.innerHTML = '<span style="color: #ef4444;">✗ Deconnecte</span>';
+          connectionStatusEl.innerHTML = '<span style="color: #ef4444;">Déconnecté</span>';
         }
       }
     }
@@ -303,7 +339,7 @@ class DiscordTestManager {
   setupEventListeners() {
     ipcRenderer.on('discord-connected', (event, user) => {
       this.updateStatus('connected', user);
-      this.showNotification('✓ Discord connecté !', 'success');
+      this.showNotification('Discord connecté', 'success');
     });
 
     ipcRenderer.on('discord-disconnected', () => {
@@ -341,7 +377,7 @@ class DiscordTestManager {
     const now = Date.now();
     if (now - this.lastTestTime < this.testCooldown) {
       const remaining = Math.ceil((this.testCooldown - (now - this.lastTestTime)) / 1000);
-      this.showNotification(`⏳ Attendez ${remaining}s avant de retester`, 'warning');
+      this.showNotification(`Attendez ${remaining}s avant de retester`, 'warning');
       return;
     }
 
@@ -381,7 +417,7 @@ class DiscordTestManager {
       : username;
 
     this.showNotification(
-      `✓ Discord connecté !\nCompte: ${fullUsername}`,
+      `Discord connecté\nCompte: ${fullUsername}`,
       'success'
     );
 
@@ -389,13 +425,13 @@ class DiscordTestManager {
   }
 
   handleTestError(result) {
-    let errorMessage = '✗ Discord non disponible';
+    let errorMessage = 'Discord non disponible';
 
     if (result.status) {
       if (result.status.connecting) {
-        errorMessage = '⏳ Connexion en cours...\nVeuillez patienter.';
+        errorMessage = 'Connexion en cours...\nVeuillez patienter.';
       } else if (result.status.reconnectAttempts > 0) {
-        errorMessage = `🔄 Reconnexion (${result.status.reconnectAttempts})...`;
+        errorMessage = `Reconnexion (${result.status.reconnectAttempts})...`;
       } else {
         errorMessage = result.message || errorMessage;
       }
@@ -407,14 +443,14 @@ class DiscordTestManager {
   handleTestException(error) {
     console.error('Erreur test Discord:', error);
 
-    let errorMsg = '✗ Erreur lors du test';
+    let errorMsg = 'Erreur lors du test';
 
     if (error.message.includes('Discord is not running')) {
-      errorMsg = '✗ Discord n\'est pas lancé\nVeuillez démarrer Discord et réessayer.';
+      errorMsg = 'Discord n\'est pas lancé\nVeuillez démarrer Discord et réessayer.';
     } else if (error.message.includes('timeout')) {
-      errorMsg = '✗ Délai d\'attente dépassé\nDiscord ne répond pas.';
+      errorMsg = 'Délai d\'attente dépassé\nDiscord ne répond pas.';
     } else {
-      errorMsg = `✗ Erreur: ${error.message}`;
+      errorMsg = `Erreur: ${error.message}`;
     }
 
     this.showNotification(errorMsg, 'error');
@@ -561,10 +597,10 @@ class DiscordTestManager {
 
   getNotificationIcon(type) {
     const icons = {
-      success: '✓',
-      error: '✗',
-      warning: '⚠',
-      info: 'ℹ'
+      success: 'OK',
+      error: 'ERROR',
+      warning: 'WARN',
+      info: 'INFO'
     };
     return icons[type] || icons.info;
   }
@@ -819,6 +855,33 @@ function renderSettings() {
             </div>
           </div>
 
+          <div class="settings-card">
+            <h3>Mises à jour du Launcher</h3>
+            <div class="setting-item">
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="check-update-startup-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+                <span>Vérifier les mises à jour au démarrage</span>
+              </label>
+              <p class="help-text">Vérifie automatiquement les nouvelles versions au lancement</p>
+            </div>
+
+            <div class="setting-item" style="margin-top: 20px;">
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="auto-update-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+                <span>Télécharger et installer automatiquement</span>
+              </label>
+              <p class="help-text">Télécharge et installe les mises à jour sans confirmation</p>
+            </div>
+
+            <div class="setting-item" style="margin-top: 20px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button id="auto-install-update-btn" class="btn-primary" style="font-size: 13px; padding: 10px;">Mettre à jour (Auto)</button>
+                <button id="manual-check-update-btn" class="btn-primary" style="font-size: 13px; padding: 10px;">Vérifier (Manuel)</button>
+              </div>
+              <p class="help-text" style="margin-top: 15px;">Auto: télécharge et installe immédiatement | Manuel: vérifier et confirmer</p>
+            </div>
+          </div>
+
           <div class="button-group">
             <button id="save-settings-btn" class="btn-primary">Valider et sauvegarder</button>
             <button id="cancel-settings-btn" class="btn-secondary">Annuler</button>
@@ -888,7 +951,7 @@ function renderSettings() {
               <p class="help-text" style="margin-top: 15px;">Acceder directement au dossier d'installation</p>
             </div>
             <div class="setting-item" style="margin-top: 20px;">
-              <button id="refresh-storage-btn" class="btn-secondary">🔄 Rafraîchir les infos</button>
+              <button id="refresh-storage-btn" class="btn-secondary">Rafraîchir les infos</button>
               <p class="help-text" style="margin-top: 15px;">Recalculer l'espace utilisé (peut prendre du temps)</p>
             </div>
             <div class="setting-item" style="margin-top: 20px;">
@@ -935,7 +998,7 @@ function renderSettings() {
             </div>
           </div>
 
-          <div class="settings-card">
+          <div class="settings-card" style="display: none;">
             <h3>Son des notifications</h3>
             <div class="setting-item">
               <label style="display: flex; align-items: center; cursor: pointer;">
@@ -1258,7 +1321,7 @@ function renderSettings() {
           ipcRenderer.send('close-settings-window');
           ipcRenderer.send('logout-from-settings');
         } catch (error) {
-          alert('✗ Erreur lors de la déconnexion');
+          alert('Erreur lors de la déconnexion');
           logoutBtn.disabled = false;
           logoutBtn.textContent = 'Se déconnecter';
         }
@@ -1279,7 +1342,7 @@ function renderSettings() {
   if (refreshStorageBtn) {
     refreshStorageBtn.addEventListener('click', async () => {
       refreshStorageBtn.disabled = true;
-      refreshStorageBtn.textContent = '⏳ Calcul en cours...';
+      refreshStorageBtn.textContent = 'Calcul en cours...';
       
       lastStorageLoadTime = 0;
       storageInfoCache = null;
@@ -1287,7 +1350,7 @@ function renderSettings() {
       await loadStorageInfo();
       
       refreshStorageBtn.disabled = false;
-      refreshStorageBtn.textContent = '🔄 Rafraîchir les infos';
+      refreshStorageBtn.textContent = 'Rafraîchir les infos';
     });
   }
 
@@ -1325,10 +1388,34 @@ function renderSettings() {
   if (testNotifBtn) {
     testNotifBtn.addEventListener('click', async () => {
       try {
-        const result = await ipcRenderer.invoke('test-notification');
-        console.log('Notification test:', result);
+        const soundEnabled = document.getElementById('sound-toggle')?.checked;
+        const volumeValue = parseInt(document.getElementById('volume-slider')?.value, 10);
+        const result = await ipcRenderer.invoke('test-notification', {
+          sound: soundEnabled,
+          volume: Number.isFinite(volumeValue) ? volumeValue : 50
+        });
+
+        if (result.success) {
+          ui.showToast({
+            title: 'Test de notification',
+            message: 'La notification de test a été envoyée.',
+            type: 'success',
+            duration: 3500
+          });
+        } else {
+          ui.showToast({
+            title: 'Erreur',
+            message: result.error || 'Impossible d\'envoyer la notification de test.',
+            type: 'error'
+          });
+        }
       } catch (error) {
         console.error('Erreur notification:', error);
+        ui.showToast({
+          title: 'Erreur',
+          message: error.message || 'Impossible d\'envoyer la notification de test.',
+          type: 'error'
+        });
       }
     });
   }
@@ -1352,9 +1439,9 @@ function renderSettings() {
         };
 
         const result = await ipcRenderer.invoke('save-notification-settings', notifSettings);
-        alert('✓ Parametres de notifications sauvegardes !');
+        alert('Parametres de notifications sauvegardes !');
       } catch (error) {
-        alert('✗ Erreur lors de la sauvegarde');
+        alert('Erreur lors de la sauvegarde');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Valider et sauvegarder';
@@ -1376,10 +1463,10 @@ function renderSettings() {
       if (confirmed) {
         try {
           await ipcRenderer.invoke('reset-notification-settings');
-          alert('✓ Notifications reinitialisees !');
+          alert('Notifications reinitialisees !');
           await loadNotificationSettings();
         } catch (error) {
-          alert('✗ Erreur');
+          alert('Erreur');
         }
       }
     });
@@ -1396,13 +1483,13 @@ function renderSettings() {
       try {
         const result = await ipcRenderer.invoke('reconnect-discord-rpc');
         if (result.success) {
-          alert('✓ Discord reconnecté !');
+          alert('Discord reconnecté !');
           await loadDiscordSettings();
         } else {
-          alert('✗ Impossible de reconnecter Discord');
+          alert('Impossible de reconnecter Discord');
         }
       } catch (error) {
-        alert('✗ Erreur');
+        alert('Erreur');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Reconnecter Discord';
@@ -1427,9 +1514,9 @@ function renderSettings() {
         };
 
         await ipcRenderer.invoke('save-discord-settings', discordSettings);
-        alert('✓ Parametres Discord sauvegardes !');
+        alert('Parametres Discord sauvegardes !');
       } catch (error) {
-        alert('✗ Erreur lors de la sauvegarde');
+        alert('Erreur lors de la sauvegarde');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Valider et sauvegarder';
@@ -1451,10 +1538,10 @@ function renderSettings() {
       if (confirmed) {
         try {
           await ipcRenderer.invoke('reset-discord-settings');
-          alert('✓ Parametres Discord reinitialisés !');
+          alert('Parametres Discord reinitialisés !');
           await loadDiscordSettings();
         } catch (error) {
-          alert('✗ Erreur');
+          alert('Erreur');
         }
       }
     });
@@ -1518,7 +1605,9 @@ function renderSettings() {
           mcHeight: parseInt(document.getElementById('mc-height')?.value || currentSettings?.mcHeight || '720', 10),
           closeLauncherOnLaunch: !!document.getElementById('close-launcher-toggle')?.checked,
           showLogsWindow: !!document.getElementById('show-logs-toggle')?.checked,
-          useProtocolConnect: !!document.getElementById('protocol-connect-toggle')?.checked
+          useProtocolConnect: !!document.getElementById('protocol-connect-toggle')?.checked,
+          checkUpdateOnStartup: !!document.getElementById('check-update-startup-toggle')?.checked,
+          autoUpdate: !!document.getElementById('auto-update-toggle')?.checked
         };
 
         if (settings.version) {
@@ -1535,9 +1624,9 @@ function renderSettings() {
         
         currentSettings = JSON.parse(JSON.stringify(settings));
         if (settings.javaPath) {
-          updateJavaStatusMessage('✓ Chemin Java sauvegardé', '#10b981');
+          updateJavaStatusMessage('Chemin Java sauvegardé', '#10b981');
         }
-        alert('✓ Parametres sauvegardes !');
+        alert('Parametres sauvegardes !');
         setTimeout(() => {
           ipcRenderer.send('close-settings-window');
         }, 300);
@@ -1563,7 +1652,7 @@ function renderSettings() {
     checkUpdatesBtn.addEventListener('click', async () => {
       checkUpdatesBtn.disabled = true;
       const originalText = checkUpdatesBtn.textContent;
-      checkUpdatesBtn.textContent = '🔄 Vérification en cours...';
+      checkUpdatesBtn.textContent = 'Vérification en cours...';
       
       const statusEl = document.getElementById('update-status');
       const installBtn = document.getElementById('install-update-btn');
@@ -1577,12 +1666,12 @@ function renderSettings() {
         const releaseNotesEl = document.getElementById('release-notes');
         
         if (result.error) {
-          statusEl.textContent = `❌ ${result.error}`;
+          statusEl.textContent = `Erreur: ${result.error}`;
           statusEl.style.color = '#ef4444';
           installBtn.style.display = 'none';
           if (changelogContainer) changelogContainer.style.display = 'none';
         } else if (result.hasUpdate) {
-          statusEl.innerHTML = `<span style="color: #10b981;">✅ Mise à jour disponible!</span><br><small style="color: #cbd5e1;">Vous êtes en v${result.currentVersion}, passer à v${result.latestVersion}</small>`;
+          statusEl.innerHTML = `<span style="color: #10b981;">Mise à jour disponible!</span><br><small style="color: #cbd5e1;">Vous êtes en v${result.currentVersion}, passer à v${result.latestVersion}</small>`;
           installBtn.style.display = 'block';
           if (versionEl) versionEl.textContent = `v${result.latestVersion}`;
           
@@ -1591,7 +1680,7 @@ function renderSettings() {
             releaseNotesEl.textContent = result.releaseNotes || 'Aucune note de version disponible';
           }
         } else {
-          statusEl.innerHTML = `<span style="color: #10b981;">✓ À jour!</span><br><small style="color: #cbd5e1;">Vous utilisez la dernière version (v${result.currentVersion})</small>`;
+          statusEl.innerHTML = `<span style="color: #10b981;">À jour!</span><br><small style="color: #cbd5e1;">Vous utilisez la dernière version (v${result.currentVersion})</small>`;
           installBtn.style.display = 'none';
           if (versionEl) versionEl.textContent = `v${result.latestVersion}`;
           if (changelogContainer) changelogContainer.style.display = 'none';
@@ -1600,7 +1689,7 @@ function renderSettings() {
         if (currentVersionEl) currentVersionEl.textContent = `v${result.currentVersion}`;
       } catch (error) {
         console.error('Erreur check-updates:', error);
-        statusEl.textContent = `❌ Erreur: ${error.message}`;
+        statusEl.textContent = `Erreur: ${error.message}`;
         statusEl.style.color = '#ef4444';
         installBtn.style.display = 'none';
         const changelogContainer = document.getElementById('changelog-container');
@@ -1626,24 +1715,118 @@ function renderSettings() {
       if (confirmed) {
         installUpdateBtn.disabled = true;
         const originalText = installUpdateBtn.textContent;
-        installUpdateBtn.textContent = '📥 Téléchargement et installation...';
-        document.getElementById('update-status').textContent = '⏳ Installation en cours...';
+        installUpdateBtn.textContent = 'Téléchargement et installation...';
+        document.getElementById('update-status').textContent = 'Installation en cours...';
         document.getElementById('update-status').style.color = '#64748b';
         
         try {
           const result = await ipcRenderer.invoke('install-update');
           if (result.success) {
-            document.getElementById('update-status').innerHTML = `<span style="color: #10b981;">✅ Installation en cours</span><br><small>L'application va redémarrer...</small>`;
+            document.getElementById('update-status').innerHTML = `<span style="color: #10b981;">Installation en cours</span><br><small>L'application va redémarrer...</small>`;
           } else {
             throw new Error(result.error);
           }
         } catch (error) {
           console.error('Erreur install-update:', error);
-          document.getElementById('update-status').textContent = `❌ Erreur: ${error.message}`;
+          document.getElementById('update-status').textContent = `Erreur: ${error.message}`;
           document.getElementById('update-status').style.color = '#ef4444';
           installUpdateBtn.disabled = false;
           installUpdateBtn.textContent = originalText;
         }
+      }
+    });
+  }
+
+  // ✅ MANUAL UPDATE CHECK BUTTON (in settings)
+  const manualCheckUpdateBtn = document.getElementById('manual-check-update-btn');
+  if (manualCheckUpdateBtn) {
+    manualCheckUpdateBtn.addEventListener('click', async () => {
+      manualCheckUpdateBtn.disabled = true;
+      const originalText = manualCheckUpdateBtn.textContent;
+      manualCheckUpdateBtn.textContent = 'Vérification en cours...';
+      
+      try {
+        const result = await ipcRenderer.invoke('check-updates');
+        
+        if (result.error) {
+          alert(`❌ Erreur: ${result.error}`);
+        } else if (result.hasUpdate) {
+          const confirm = await ui.showConfirm({
+            title: 'Mise à jour disponible',
+            message: `Velkora v${result.latestVersion} est disponible.\nVersion actuelle: v${result.currentVersion}\n\nVoulez-vous installer la mise à jour ?`,
+            confirmLabel: 'Installer',
+            cancelLabel: 'Plus tard',
+            type: 'info'
+          });
+          if (confirm) {
+            try {
+              const installResult = await ipcRenderer.invoke('install-update');
+              if (installResult.success) {
+                console.log('✅ Installation lancée');
+              }
+            } catch (err) {
+              alert(`❌ Erreur installation: ${err.message}`);
+            }
+          }
+        } else {
+          await ui.showDialog({
+            title: '✅ Le launcher est à jour',
+            message: `Vous utilisez déjà la dernière version disponible.\n\nVersion actuelle: v${result.currentVersion}\n\nAucune mise à jour n'est nécessaire.`,
+            type: 'success'
+          });
+        }
+      } catch (error) {
+        console.error('Erreur check-updates:', error);
+        alert(`❌ Erreur: ${error.message}`);
+      } finally {
+        manualCheckUpdateBtn.disabled = false;
+        manualCheckUpdateBtn.textContent = originalText;
+      }
+    });
+  }
+
+  // ✅ AUTO UPDATE BUTTON (in settings)
+  const autoInstallUpdateBtn = document.getElementById('auto-install-update-btn');
+  if (autoInstallUpdateBtn) {
+    autoInstallUpdateBtn.addEventListener('click', async () => {
+      autoInstallUpdateBtn.disabled = true;
+      const originalText = autoInstallUpdateBtn.textContent;
+      autoInstallUpdateBtn.textContent = 'Vérification...';
+      
+      try {
+        const result = await ipcRenderer.invoke('check-updates');
+        
+        if (result.error) {
+          alert(`❌ Erreur: ${result.error}`);
+        } else if (result.hasUpdate) {
+          autoInstallUpdateBtn.textContent = 'Téléchargement...';
+          try {
+            const installResult = await ipcRenderer.invoke('install-update');
+            if (installResult.success) {
+              autoInstallUpdateBtn.textContent = 'Installation...';
+              console.log('✅ Installation lancée');
+            } else {
+              alert(`❌ Erreur: ${installResult.error}`);
+            }
+          } catch (err) {
+            alert(`❌ Erreur installation: ${err.message}`);
+            autoInstallUpdateBtn.disabled = false;
+            autoInstallUpdateBtn.textContent = originalText;
+          }
+        } else {
+          await ui.showDialog({
+            title: '✅ Le launcher est à jour',
+            message: `Vous utilisez déjà la dernière version disponible.\n\nVersion actuelle: v${result.currentVersion}\n\nAucune mise à jour n'est nécessaire.`,
+            type: 'success'
+          });
+          autoInstallUpdateBtn.disabled = false;
+          autoInstallUpdateBtn.textContent = originalText;
+        }
+      } catch (error) {
+        console.error('Erreur check-updates:', error);
+        alert(`❌ Erreur: ${error.message}`);
+        autoInstallUpdateBtn.disabled = false;
+        autoInstallUpdateBtn.textContent = originalText;
       }
     });
   }
@@ -1681,9 +1864,9 @@ function renderSettings() {
         await ipcRenderer.invoke('save-settings', settings);
         currentSettings = JSON.parse(JSON.stringify(settings));
         if (javaPath) {
-          updateJavaStatusMessage('✓ Chemin Java sauvegardé', '#10b981');
+          updateJavaStatusMessage('Chemin Java sauvegardé', '#10b981');
         }
-        alert('✓ Paramètres du jeu sauvegardés');
+        alert('Paramètres du jeu sauvegardés');
       } catch (e) {
         alert('✗ Erreur lors de la sauvegarde');
       } finally {
@@ -1736,7 +1919,7 @@ function renderSettings() {
         
         if (detectResult.found && detectResult.path) {
           javaPathInput.value = detectResult.path;
-          detectedPathEl.textContent = `✓ Java ${javaVersion} trouvé: ${detectResult.path}`;
+          detectedPathEl.textContent = `Java ${javaVersion} trouvé: ${detectResult.path}`;
           detectedPathEl.style.color = '#10b981';
         } else {
           detectedPathEl.textContent = `✗ Java ${javaVersion} non trouvé dans C:\\Program Files\\Java\\`;
@@ -1744,7 +1927,7 @@ function renderSettings() {
         }
       } catch (error) {
         console.error('Erreur detect-java:', error);
-        document.getElementById('java-detected-path').textContent = `✗ Erreur: ${error.message}`;
+        document.getElementById('java-detected-path').textContent = `Erreur: ${error.message}`;
         document.getElementById('java-detected-path').style.color = '#ef4444';
       } finally {
         detectBtn.disabled = false;
@@ -1773,7 +1956,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderSettings();
     console.log('✅ renderSettings done');
   } catch (error) {
-    console.error('❌ Erreur lors du rendu:', error);
+    console.error('Erreur lors du rendu:', error);
   }
   await loadSettings();
   await loadAccountInfo();
