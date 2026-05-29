@@ -4,7 +4,7 @@ Un launcher **Minecraft complet et moderne** offrant une expérience utilisateur
 
 ![Version](https://img.shields.io/badge/version-4.2.9-blue.svg)
 ![License](https://img.shields.io/badge/license-VCv1-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20-red.svg)
+![Platform](https://img.shields.io/badge/platform-Windows-red.svg)
 
 ---
 
