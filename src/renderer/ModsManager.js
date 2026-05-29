@@ -3,7 +3,23 @@
  * Responsabilité: Gérer, importer et contrôler les mods
  */
 
-const { ipcRenderer } = require('electron');
+let ipcRenderer;
+try {
+  if (window && window.electron && window.electron.ipcRenderer) {
+    ipcRenderer = window.electron.ipcRenderer;
+  } else if (typeof require === 'function') {
+    try {
+      const _electron = require('electron');
+      ipcRenderer = _electron && _electron.ipcRenderer ? _electron.ipcRenderer : _electron;
+    } catch (_) {
+      ipcRenderer = null;
+    }
+  } else {
+    ipcRenderer = null;
+  }
+} catch (e) {
+  ipcRenderer = null;
+}
 const path = require('path');
 const { icons: lucideIcons } = require('./lucide-icons');
 
@@ -1051,7 +1067,7 @@ class ModsManager {
     } catch (error) {
       console.error('❌ Erreur import:', error);
       this.showToast({
-        title: 'Erreur d import',
+        title: 'Erreur d\'import',
         message: error.message,
         type: 'error'
       });
@@ -1152,7 +1168,7 @@ class ModsManager {
 
   async rerenderModsView() {
     this.app.currentView = 'mods';
-    await this.app.render();
+    await this.app.render(true); // ✅ forceRerender=true pour forcer la mise à jour même en restant sur la même vue
   }
 
   /**

@@ -1,4 +1,20 @@
-const { ipcRenderer } = require('electron');
+let ipcRenderer;
+try {
+  if (window && window.electron && window.electron.ipcRenderer) {
+    ipcRenderer = window.electron.ipcRenderer;
+  } else if (typeof require === 'function') {
+    try {
+      const _electron = require('electron');
+      ipcRenderer = _electron && _electron.ipcRenderer ? _electron.ipcRenderer : _electron;
+    } catch (_) {
+      ipcRenderer = null;
+    }
+  } else {
+    ipcRenderer = null;
+  }
+} catch (e) {
+  ipcRenderer = null;
+}
 const LauncherVersion = require('../main/launcher-version.js');
 const UIFeedback = require('./ui-feedback.js');
 const { icons: lucideIcons } = require('./lucide-icons.js');
@@ -1973,9 +1989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   
   // 🔔 Signaler au main process que la fenêtre est prête
-  ipcRenderer.invoke('settings-window-ready').catch(err => {
-    console.warn('Erreur lors du signalement de settings-window-ready:', err);
-  });
+  ipcRenderer.send('settings-window-ready');
   
   setTimeout(() => {
     document.getElementById('check-updates-btn')?.click();

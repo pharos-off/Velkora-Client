@@ -1,4 +1,20 @@
-const { ipcRenderer } = require('electron');
+let ipcRenderer;
+try {
+  if (window && window.electron && window.electron.ipcRenderer) {
+    ipcRenderer = window.electron.ipcRenderer;
+  } else if (typeof require === 'function') {
+    try {
+      const _electron = require('electron');
+      ipcRenderer = _electron && _electron.ipcRenderer ? _electron.ipcRenderer : _electron;
+    } catch (_) {
+      ipcRenderer = null;
+    }
+  } else {
+    ipcRenderer = null;
+  }
+} catch (e) {
+  ipcRenderer = null;
+}
 const LauncherFeatures = require('./features.js');
 const ModsManager = require('./ModsManager.js');
 const UIFeedback = require('./ui-feedback.js');
@@ -6,7 +22,8 @@ const LauncherVersion = require('../main/launcher-version.js');
 const KeyboardShortcuts = require('../main/keyboard-shortcuts.js');
 const { icons: lucideIcons } = require('./lucide-icons');
 const ThemeManager = require('./theme-manager.js');
-//const MusicPlayer = require('./radio-player.js');
+const MusicPlayer = require('./radio-player.js');
+// ✅ PageLoader est chargé globalement via <script src="PageLoader.js"></script> dans index.html
 
 // ✅ STUB GLOBAL POUR ÉVITER LES ERREURS DE TIMING
 window.themeManager = null; // Sera initialisé après DOM ready
@@ -95,6 +112,9 @@ class CraftLauncherApp {
     this.deferredDataPromise = null;
     this.shortcuts = new KeyboardShortcuts(this);
     this.newsCategoryFilter = 'all';
+    this.pageLoader = new PageLoader(); // ✅ Initialiser le PageLoader
+    this.isFirstContentRender = true; // ✅ Flag pour le premier rendu de contenu
+    this.lastRenderedView = null; // ✅ Tracker la dernière vue rendue pour éviter les recharges inutiles
     
     // ✅ Utiliser le gestionnaire de thème au lieu de dupliquer les données
     this.themePresets = window.themeManager.themePresets;
@@ -615,7 +635,7 @@ class CraftLauncherApp {
     }
   }
 
-  render() {
+  render(forceRerender = false) {
     console.log('📱 [RENDERER] render() called - authData:', this.authData ? `${this.authData.username}` : 'NULL');
     const appContainer = document.getElementById('app');
     if (!this.authData) {
@@ -631,6 +651,7 @@ class CraftLauncherApp {
       console.log('📱 [RENDERER] Rendering LOGIN view');
       appContainer.innerHTML = this.renderLogin();
       this.setupLoginEvents();
+      this.lastRenderedView = 'login'; // ✅ Mettre à jour la dernière vue rendue
     } else {
       // Afficher le layout principal d'abord
       const mainHtml = this.renderMainLayout();
@@ -657,7 +678,7 @@ class CraftLauncherApp {
       this.applyAccentColor(accent);
       
       // Puis charger le contenu asynchrone
-      this.renderContentAsync();
+      this.renderContentAsync(forceRerender);
     }
   }
 
@@ -715,42 +736,51 @@ class CraftLauncherApp {
     }
   }
 
-  async renderContentAsync() {
+  async renderContentAsync(forceRerender = false) {
     const contentDiv = document.getElementById('main-content-view');
     if (!contentDiv) {
       console.error('main-content-view not found');
       return;
     }
 
+    // ✅ VÉRIFIER SI LA VUE N'A PAS CHANGÉ (sauf si forceRerender)
+    if (!forceRerender && this.currentView === this.lastRenderedView) {
+      console.log(`📱 [RENDERER] Même vue (${this.currentView}), pas de rechargement`);
+      this.pageLoader.hide(); // ✅ Cacher le loading screen si montré
+      return;
+    }
+
     try {
-      // ✅ CLEANUP: Nettoyer l'ancienne vue
-      this.cleanupView();
+      // ✅ UTILISER LE PAGE LOADER POUR LES CHANGEMENTS DE PAGES
+      const renderFunction = async () => {
+        return await this.renderCurrentView();
+      };
       
-      const html = await this.renderCurrentView();
-      contentDiv.innerHTML = html;
-      const scripts = Array.from(contentDiv.querySelectorAll('script'));
-      scripts.forEach(script => {
-        const newScript = document.createElement('script');
-        if (script.src) {
-          newScript.src = script.src;
-        } else {
-          newScript.textContent = script.textContent;
-        }
-        document.head.appendChild(newScript);
-        script.remove();
-      });
+      const setupFunction = () => {
+        // ✅ RÉAPPLIQUER LE THÈME APRÈS LE RENDU (sans render() pour éviter boucle)
+        const theme = localStorage.getItem('theme') || 'dark';
+        const accent = localStorage.getItem('accent') || 'indigo';
+        
+        this.applyThemeSelection(theme);
+        this.applyAccentColor(accent);
+        
+        this.setupMainEvents();
+      };
       
-      // ✅ RÉAPPLIQUER LE THÈME APRÈS LE RENDU (sans render() pour éviter boucle)
-      const theme = localStorage.getItem('theme') || 'dark';
-      const accent = localStorage.getItem('accent') || 'indigo';
+      // ✅ Ne pas afficher le loading screen lors des changements de pages (transisions directes)
+      const shouldShowLoading = false;
+      await this.pageLoader.loadPage(renderFunction, setupFunction, shouldShowLoading);
       
-      this.applyThemeSelection(theme);
-      this.applyAccentColor(accent);
+      // ✅ Mettre à jour la dernière vue rendue
+      this.lastRenderedView = this.currentView;
       
-      this.setupMainEvents();
+      // ✅ Après le premier rendu, toujours afficher le loading screen pour les changements
+      this.isFirstContentRender = false;
+      
     } catch (error) {
       console.error('Erreur rendu contenu:', error);
       contentDiv.innerHTML = `<div style="padding: 20px; color: #ef4444;">Erreur: ${error.message}</div>`;
+      this.pageLoader.hide();
     }
   }
 renderMainLayout() {
@@ -790,19 +820,19 @@ renderMainLayout() {
 
           <div class="sidebar-menu">
             <div>
-              <button class="menu-item ${this.currentView === 'main' ? 'active' : ''}" data-view="main">
+              <button class="menu-item ${this.currentView === 'main' ? 'active' : ''}" data-view="main" ${this.currentView === 'main' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-house-door"></i></span> Accueil
               </button>
               <button class="menu-item ${this.currentView === 'friends' ? 'active' : ''}" data-view="friends" disabled style="opacity: 0.5; cursor: not-allowed;">
                 <span class="menu-icon"><i class="bi bi-people"></i></span> Amis
               </button>
-              <button class="menu-item ${this.currentView === 'servers' ? 'active' : ''}" data-view="servers">
+              <button class="menu-item ${this.currentView === 'servers' ? 'active' : ''}" data-view="servers" ${this.currentView === 'servers' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-globe"></i></span> Serveurs
               </button>
-              <button class="menu-item ${this.currentView === 'partners' ? 'active' : ''}" data-view="partners">
+              <button class="menu-item ${this.currentView === 'partners' ? 'active' : ''}" data-view="partners" ${this.currentView === 'partners' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-star"></i></span> Partenaires
               </button>
-              <button class="menu-item ${this.currentView === 'screenshots' ? 'active' : ''}" data-view="screenshots">
+              <button class="menu-item ${this.currentView === 'screenshots' ? 'active' : ''}" data-view="screenshots" ${this.currentView === 'screenshots' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-images"></i></span> Screenshots & Sauvegardes
               </button>
             </div>
@@ -811,25 +841,25 @@ renderMainLayout() {
               <button class="menu-item ${this.currentView === 'stats' ? 'active' : ''}" data-view="stats" disabled style="opacity: 0.5; cursor: not-allowed;">
                 <span class="menu-icon"><i class="bi bi-bar-chart"></i></span> Statistiques
               </button>
-              <button class="menu-item ${this.currentView === 'versions' ? 'active' : ''}" data-view="versions">
+              <button class="menu-item ${this.currentView === 'versions' ? 'active' : ''}" data-view="versions" ${this.currentView === 'versions' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-search"></i></span> Versions
               </button>
-              <button class="menu-item ${this.currentView === 'mods' ? 'active' : ''}" data-view="mods">
+              <button class="menu-item ${this.currentView === 'mods' ? 'active' : ''}" data-view="mods" ${this.currentView === 'mods' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-puzzle"></i></span> Mods
               </button>
-              <button class="menu-item ${this.currentView === 'theme' ? 'active' : ''}" data-view="theme">
+              <button class="menu-item ${this.currentView === 'theme' ? 'active' : ''}" data-view="theme" ${this.currentView === 'theme' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-palette"></i></span> Thème
               </button>
             </div>
 
             <div style="border-top: 1px solid rgba(99, 102, 241, 0.1); margin: 12px 0; padding-top: 12px;">
-              <button class="menu-item ${this.currentView === 'help' ? 'active' : ''}" data-view="help">
+              <button class="menu-item ${this.currentView === 'help' ? 'active' : ''}" data-view="help" ${this.currentView === 'help' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-question-circle"></i></span> Aide & Support
               </button>
             </div>
 
             <div style="border-top: 1px solid rgba(99, 102, 241, 0.1); margin: 12px 0; padding-top: 12px;">
-              <button class="menu-item" data-view="settings">
+              <button class="menu-item" data-view="settings" ${this.currentView === 'settings' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-gear"></i></span> Paramètres
               </button>
             </div>
@@ -3337,7 +3367,27 @@ renderMainLayout() {
     }
   }
 
+  // ✅ Nettoyer les listeners de setupMainEvents
+  cleanupMainEvents() {
+    try {
+      if (this.viewChangeListener) {
+        document.removeEventListener('click', this.viewChangeListener);
+        this.viewChangeListener = null;
+      }
+      
+      // Marquer les thèmes comme non-attachés pour éviter les doublons
+      document.querySelectorAll('.theme-option').forEach(btn => {
+        btn._themeListenerAdded = false;
+      });
+    } catch (e) {
+      console.warn('Erreur cleanupMainEvents:', e);
+    }
+  }
+
   setupMainEvents() {
+    // ✅ Nettoyer les anciens listeners avant d'en ajouter de nouveaux
+    this.cleanupMainEvents();
+    
     // Fallback multi-CDN pour l'avatar du joueur
     setTimeout(() => {
       const img = document.getElementById('player-head-img');
@@ -3360,17 +3410,18 @@ renderMainLayout() {
         }, { once: false });
       }
     }, 0);
-    
-    // ✅ CLEANUP: Supprimer l'ancien listener de changement de vue s'il existe
-    if (this.viewChangeListener) {
-      document.removeEventListener('click', this.viewChangeListener);
-    }
 
     // ✨ GESTIONNAIRE DE CHANGEMENT DE VUE (TODOS LES MENUS)
     this.viewChangeListener = (e) => {
       const button = e.target.closest('[data-view]');
       if (button && !button.disabled) {
         const view = this.normalizeViewName(button.getAttribute('data-view'));
+        
+        // ✅ Ne pas recharger si on est déjà sur cette vue (avec String pour robustesse)
+        if (String(view).toLowerCase() === String(this.lastRenderedView).toLowerCase()) {
+          console.log(`📱 [RENDERER] Déjà sur la page ${view}, pas de rechargement`);
+          return;
+        }
         
         // Cas spécial pour Paramètres
         if (view === 'settings') {
@@ -3562,7 +3613,7 @@ renderMainLayout() {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const url = btn.dataset.visitPartner;
-        require('electron').shell.openExternal(url);
+        window.electron.shell.openExternal(url);
       });
     });
 
@@ -3573,7 +3624,7 @@ renderMainLayout() {
         const version = btn.dataset.downloadVersion;
         // Ouvrir PaperMC pour cette version spécifique
         const paperMcUrl = `https://fill-ui.papermc.io/projects/paper/version/${version}`;
-        require('electron').shell.openExternal(paperMcUrl);
+        window.electron.shell.openExternal(paperMcUrl);
       });
     });
 
@@ -3586,14 +3637,14 @@ renderMainLayout() {
         if (serverIP !== 'realms') {
           this.launchGame(serverIP);
         } else {
-          require('electron').shell.openExternal('https://www.minecraft.net/realms');
+          window.electron.shell.openExternal('https://www.minecraft.net/realms');
         }
       });
     });
 
     // ✅ CONTACT PARTENAIRES
     document.getElementById('contact-partner-btn')?.addEventListener('click', () => {
-      require('electron').shell.openExternal('mailto:contact.vellkoramc@gmail.com?subject=Devenir Partenaire');
+      window.electron.shell.openExternal('mailto:contact.vellkoramc@gmail.com?subject=Devenir Partenaire');
     });
 
     // ✅ NETTOYER LES ANCIENS LISTENERS AVANT D'EN AJOUTER DE NOUVEAUX
@@ -4163,17 +4214,17 @@ renderMainLayout() {
 
     // ✅ BOUTONS D'ACTION - DISCORD
     document.getElementById('help-discord-join-btn')?.addEventListener('click', () => {
-      require('electron').shell.openExternal('https://discord.gg/rCFBHZencT');
+      window.electron.shell.openExternal('https://discord.gg/rCFBHZencT');
     });
 
     // ✅ BOUTONS D'ACTION - GITHUB ISSUES
     document.getElementById('help-bug-report-btn')?.addEventListener('click', () => {
-      require('electron').shell.openExternal('https://github.com/velkora/launcher/issues/new');
+      window.electron.shell.openExternal('https://github.com/velkora/launcher/issues/new');
     });
 
     // ✅ BOUTONS D'ACTION - GITHUB PROJECT
     document.getElementById('help-github-project-btn')?.addEventListener('click', () => {
-      require('electron').shell.openExternal('https://github.com/velkora/launcher');
+      window.electron.shell.openExternal('https://github.com/velkora/launcher');
     });
   }
 

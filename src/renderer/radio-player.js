@@ -19,13 +19,31 @@ class MusicPlayer {
     };
     
     // ✅ Charger le chemin des assets via IPC
-    const { ipcRenderer } = require('electron');
-    ipcRenderer.invoke('get-assets-path').then(path => {
+    let ipcRenderer;
+    try {
+      if (window && window.electron && window.electron.ipcRenderer) {
+        ipcRenderer = window.electron.ipcRenderer;
+      } else if (typeof require === 'function') {
+        try {
+          const _electron = require('electron');
+          ipcRenderer = _electron && _electron.ipcRenderer ? _electron.ipcRenderer : _electron;
+        } catch (_) {
+          ipcRenderer = null;
+        }
+      } else {
+        ipcRenderer = null;
+      }
+    } catch (e) {
+      ipcRenderer = null;
+    }
+    if (ipcRenderer) {
+      ipcRenderer.invoke('get-assets-path').then(path => {
       this.assetsPath = path;
       console.log('✅ Assets path loaded:', this.assetsPath);
-    }).catch(err => {
-      console.error('Erreur chargement assets path:', err);
-    });
+      }).catch(err => {
+        console.error('Erreur chargement assets path:', err);
+      });
+    }
 
     // ✅ Sauvegarder le temps actuel toutes les secondes
     setInterval(() => {

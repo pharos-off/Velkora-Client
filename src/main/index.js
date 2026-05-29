@@ -32,7 +32,7 @@ const networkManager = new NetworkManager({
 });
 
 
-const LAUNCHER_VERSION = '4.2.7';
+const LAUNCHER_VERSION = '4.2.9';
 const LAUNCHER_BUILD = '20260527';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
@@ -75,6 +75,12 @@ let apiProcess = null;
 
 function startApiServer() {
   const serverPath = path.join(__dirname, "../../server.js");
+
+  // ✅ Vérifier que le fichier exists avant de lancer
+  if (!fs.existsSync(serverPath)) {
+    console.warn('[API] Fichier server.js non trouvé:', serverPath);
+    return;
+  }
 
   apiProcess = spawn("node", [serverPath], {
     shell: true,
@@ -332,8 +338,11 @@ function createWindow() {
     backgroundColor: '#0f172a',
     show: true,
     webPreferences: {
+      contextIsolation: false,
       nodeIntegration: true,
-      contextIsolation: false
+      enableRemoteModule: false,
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   };
 
@@ -406,8 +415,11 @@ function createSettingsWindow() {
     backgroundColor: '#0f172a',
     skipTaskbar: false,
     webPreferences: {
+      contextIsolation: false,
       nodeIntegration: true,
-      contextIsolation: false
+      enableRemoteModule: false,
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   };
 
@@ -426,6 +438,11 @@ function createSettingsWindow() {
   setSettingsWindow(settingsWindow);
 
   settingsWindow.loadFile(path.join(__dirname, '../renderer/settings.html'));
+
+  // Ouvrir DevTools en mode dev
+  if (process.argv.some(arg => arg === '--dev' || arg === 'dev')) {
+    settingsWindow.webContents.openDevTools();
+  }
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
@@ -450,8 +467,11 @@ function createLogsWindow() {
     backgroundColor: '#0a0e27',
     skipTaskbar: false,
     webPreferences: {
+      contextIsolation: false,
       nodeIntegration: true,
-      contextIsolation: false
+      enableRemoteModule: false,
+      sandbox: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   };
 
@@ -465,6 +485,15 @@ function createLogsWindow() {
   }
 
   logsWindow = new BrowserWindow(windowOptions);
+
+  // Ouvrir DevTools en mode dev
+  if (process.argv.some(arg => arg === '--dev' || arg === 'dev')) {
+    setTimeout(() => {
+      if (logsWindow && !logsWindow.isDestroyed()) {
+        logsWindow.webContents.openDevTools();
+      }
+    }, 1000);
+  }
 
   // Créer l'HTML de la fenêtre des logs
   const logsHTML = `
@@ -1000,7 +1029,7 @@ ipcMain.handle('subscribe-newsletter', async (event, { email }) => {
     return { success: true, message: 'Subscription successful' };
   } catch (error) {
     console.error('Newsletter subscription error:', error);
-    return { success: true }; // Retourner success même en cas d'erreur
+    return { success: false, error: error.message || String(error) };
   }
 });
 
@@ -1240,9 +1269,21 @@ app.whenReady().then(async () => {
     createWindow();
   }, 500);
   
-  const discordEnabled = store.get('settings.discordRPC', false);
+  // Support both legacy `settings.discordRPC` and canonical `discord.rpcEnabled`
+  let discordEnabled = store.get('discord.rpcEnabled');
+  if (typeof discordEnabled === 'undefined') {
+    discordEnabled = store.get('settings.discordRPC', false);
+  }
   if (discordEnabled) {
-    await discordRPC.connect();
+    try {
+      if (!discordRPC) {
+        await initializeDiscord();
+      } else if (!discordRPC.isConnected) {
+        await discordRPC.connect();
+      }
+    } catch (e) {
+      console.warn('⚠️ Discord startup skipped:', e && e.message ? e.message : e);
+    }
   }
   
   // Créer l'icône de zone de notification (Windows)
@@ -1463,9 +1504,11 @@ ipcMain.handle('get-storage-info', async () => {
 
     // Utiliser du command pour calculer la taille (beaucoup plus rapide)
     const { exec } = require('child_process');
-    
+    // Sanitize path for PowerShell single-quoted string by doubling single quotes
+    const safeGameDir = String(gameDir || '').replace(/'/g, "''");
+
     return new Promise((resolve) => {
-      exec(`powershell -Command "Get-ChildItem -Path '${gameDir}' -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name='Size';Expression={$_.Sum}}"`, 
+      exec(`powershell -Command "Get-ChildItem -Path '${safeGameDir}' -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name='Size';Expression={$_.Sum}}"`, 
         { encoding: 'utf8' },
         (error, stdout, stderr) => {
           try {
@@ -1891,7 +1934,13 @@ ipcMain.handle('get-game-stats', async () => {
 // Déconnexion
 ipcMain.handle('logout', async () => {
   store.delete('authData');
-  await discordRPC.clear();
+  try {
+    if (discordRPC && typeof discordRPC.clear === 'function') {
+      await discordRPC.clear();
+    }
+  } catch (e) {
+    console.warn('⚠️ Discord clear failed during logout:', e && e.message ? e.message : e);
+  }
   return { success: true };
 });
 
@@ -2242,6 +2291,12 @@ ipcMain.handle('get-settings', async () => {
 
 ipcMain.handle('save-settings', async (event, settings) => {
   store.set('settings', settings);
+  // Keep discord.rpcEnabled in sync for legacy/other modules
+  try {
+    if (typeof settings.discordRPC !== 'undefined') {
+      store.set('discord.rpcEnabled', !!settings.discordRPC);
+    }
+  } catch (_) {}
   
   try {
     if (settings.discordRPC !== undefined && discordRPC) {
@@ -2535,7 +2590,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
       }
 
       // ✅ METTRE À JOUR DISCORD RPC (avec vérification)
-      if (discordRPC && discordRPC.connected) {
+      if (discordRPC && discordRPC.isConnected) {
         try {
           console.log('📡 Mise à jour Discord RPC...');
           await discordRPC.setPlaying(profile.version);
@@ -2590,7 +2645,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
         minecraftRunning = false;
         
         // Discord RPC: remettre en idle
-        if (discordRPC && discordRPC.connected) {
+        if (discordRPC && discordRPC.isConnected) {
           discordRPC.setIdle().catch(err => {
             console.warn('⚠️ Erreur Discord setIdle:', err.message);
           });
@@ -3057,7 +3112,7 @@ async function checkUpdatesAndInstall() {
     
     // Récupérer les releases
     const response = await fetch('https://api.github.com/repos/pharos-off/Velkora/releases/', {
-      headers: { 'User-Agent': 'VellkoraMC' }
+      headers: { 'User-Agent': `${LAUNCHER_NAME}/${LAUNCHER_VERSION}` }
     });
     
     if (!response.ok) {
@@ -3139,7 +3194,7 @@ async function checkUpdatesWithSettings(autoUpdate = true) {
     
     // Récupérer les releases
     const response = await fetch('https://api.github.com/repos/pharos-off/Velkora/releases/', {
-      headers: { 'User-Agent': 'VellkoraMC' }
+      headers: { 'User-Agent': `${LAUNCHER_NAME}/${LAUNCHER_VERSION}` }
     });
     
     if (!response.ok) {
@@ -3233,7 +3288,7 @@ ipcMain.handle('check-updates', async () => {
     
     // Récupérer les 5 dernières releases
     const response = await fetch('https://api.github.com/repos/pharos-off/Velkora/releases', {
-      headers: { 'User-Agent': '${LAUNCHER_NAME}' }
+      headers: { 'User-Agent': LAUNCHER_NAME }
     });
     
     if (!response.ok) {
@@ -4773,16 +4828,47 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-ipcMain.on('minimize-window', () => mainWindow.minimize());
 ipcMain.on('maximize-window', () => {
-  mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
+  if (mainWindow) mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
 });
 
 ipcMain.on('close-window', () => {
-  discordRPC.disconnect();
-  mainWindow.close();
+  try {
+    if (discordRPC && typeof discordRPC.disconnect === 'function') {
+      // disconnect may be async
+      discordRPC.disconnect().catch(() => {});
+    }
+  } catch (_) {}
+
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close(); } catch(_) {}
 });
 
 ipcMain.on('open-external', (event, url) => {
   require('electron').shell.openExternal(url);
+});
+
+// ✅ HANDLERS POUR LA FENÊTRE DE LOGS
+ipcMain.on('minimize-logs-window', () => {
+  if (logsWindow && !logsWindow.isDestroyed()) logsWindow.minimize();
+});
+
+ipcMain.on('maximize-logs-window', () => {
+  if (logsWindow && !logsWindow.isDestroyed()) {
+    logsWindow.isMaximized() ? logsWindow.unmaximize() : logsWindow.maximize();
+  }
+});
+
+ipcMain.on('close-logs-window', () => {
+  if (logsWindow && !logsWindow.isDestroyed()) logsWindow.close();
+});
+
+ipcMain.on('clear-logs', () => {
+  currentLogs = [];
+});
+
+ipcMain.on('settings-window-ready', () => {
+  // Fenêtre paramètres prête
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send('settings-loaded');
+  }
 });

@@ -944,7 +944,7 @@ class MinecraftLauncher {
         try {
           const response = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest.json', {
             signal: controller.signal,
-            headers: { 'User-Agent': 'VellkoraMC/3.0' }
+              headers: { 'User-Agent': 'Velkora Client/3.0' }
           });
 
           clearTimeout(timeout);
@@ -974,8 +974,6 @@ class MinecraftLauncher {
         } finally {
           if (timeout) clearTimeout(timeout);
         }
-        lastError = error;
-        // silent retry
       }
       catch (error) {
         lastError = error;

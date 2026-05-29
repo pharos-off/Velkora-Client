@@ -60,12 +60,12 @@ class MicrosoftAuth {
           width: 600,
           height: 700,
           show: true,
-          icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+          icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
           webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
-            session: authSession
+            partition: 'persist:auth'
           }
         });
 
