@@ -32,7 +32,7 @@ const networkManager = new NetworkManager({
 });
 
 
-const LAUNCHER_VERSION = '4.3.1';
+const LAUNCHER_VERSION = '4.3.2';
 const LAUNCHER_BUILD = '20260620';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {

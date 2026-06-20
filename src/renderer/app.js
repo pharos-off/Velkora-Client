@@ -3552,21 +3552,54 @@ renderMainLayout() {
         }
       }
 
-      // ✨ THÈME - MODE D'AFFICHAGE
+      // ✨ THÈME - MODE D'AFFICHAGE (pas de rendu complet, juste appliquer les styles)
       const themeBtn = e.target.closest('.theme-option');
       if (themeBtn) {
         const theme = themeBtn.dataset.theme;
         localStorage.setItem('theme', theme);
         this.applyThemeSelection(theme);
-        this.render();
+        
+        // 🎨 Mettre à jour visuellement les boutons de thème
+        document.querySelectorAll('.theme-option').forEach(btn => {
+          if (btn.dataset.theme === theme) {
+            btn.classList.add('active');
+            btn.style.borderColor = '#6366f1';
+          } else {
+            btn.classList.remove('active');
+            btn.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+          }
+        });
+        
+        // 🎨 Mettre à jour l'affichage du thème actuel dans le UI
+        const currentThemeDisplay = document.querySelector('[style*="Thème actuel"]')?.nextElementSibling;
+        if (currentThemeDisplay) {
+          const themeOptions = [
+            { id: 'dark', label: 'Sombre' },
+            { id: 'neon', label: 'Neon' },
+            { id: 'metro', label: 'Metro' }
+          ];
+          const themeLabel = themeOptions.find(t => t.id === theme)?.label || 'Sombre';
+          currentThemeDisplay.textContent = themeLabel;
+        }
       }
 
-      // ✨ THÈME - COULEUR D'ACCENT
+      // ✨ THÈME - COULEUR D'ACCENT (pas de rendu complet, juste appliquer les styles)
       const accentBtn = e.target.closest('.accent-option');
       if (accentBtn) {
         const accent = accentBtn.dataset.accent;
         localStorage.setItem('accent', accent);
         this.applyAccentColor(accent);
+        
+        // 🎨 Mettre à jour visuellement les boutons d'accent
+        document.querySelectorAll('.accent-option').forEach(btn => {
+          if (btn.dataset.accent === accent) {
+            btn.classList.add('active');
+            btn.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.3)';
+          } else {
+            btn.classList.remove('active');
+            btn.style.boxShadow = 'none';
+          }
+        });
       }
 
       // 🗂️ Filtrer les actualités par catégorie
@@ -3613,7 +3646,29 @@ renderMainLayout() {
           if (!theme) return;
           localStorage.setItem('theme', theme);
           this.applyThemeSelection(theme);
-          this.render();
+          
+          // 🎨 Mettre à jour visuellement les boutons de thème
+          document.querySelectorAll('.theme-option').forEach(b => {
+            if (b.dataset.theme === theme) {
+              b.classList.add('active');
+              b.style.borderColor = '#6366f1';
+            } else {
+              b.classList.remove('active');
+              b.style.borderColor = 'rgba(99, 102, 241, 0.2)';
+            }
+          });
+          
+          // 🎨 Mettre à jour l'affichage du thème actuel
+          const currentThemeDisplay = document.querySelector('[style*="Thème actuel"]')?.nextElementSibling;
+          if (currentThemeDisplay) {
+            const themeOptions = [
+              { id: 'dark', label: 'Sombre' },
+              { id: 'neon', label: 'Neon' },
+              { id: 'metro', label: 'Metro' }
+            ];
+            const themeLabel = themeOptions.find(t => t.id === theme)?.label || 'Sombre';
+            currentThemeDisplay.textContent = themeLabel;
+          }
         });
       });
 
@@ -3626,6 +3681,17 @@ renderMainLayout() {
           if (!accent) return;
           localStorage.setItem('accent', accent);
           this.applyAccentColor(accent);
+          
+          // 🎨 Mettre à jour visuellement les boutons d'accent
+          document.querySelectorAll('.accent-option').forEach(b => {
+            if (b.dataset.accent === accent) {
+              b.classList.add('active');
+              b.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.3)';
+            } else {
+              b.classList.remove('active');
+              b.style.boxShadow = 'none';
+            }
+          });
         });
       });
     }, 100);

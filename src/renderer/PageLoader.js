@@ -165,21 +165,24 @@ class PageLoader {
         return;
       }
       
+      const originalOpacity = contentDiv.style.opacity;
+      const originalTransition = contentDiv.style.transition;
+      
       // Afficher le loading screen (optionnel)
       if (showLoading) {
         this.show();
       } else {
-        // Ajouter une animation de fade-out si pas de loading screen
+        // Ne pas modifier l'opacité si pas de loading - juste ajouter une transition smooth
         contentDiv.style.transition = 'opacity 0.3s ease-out';
-        contentDiv.style.opacity = '0.7';
-        await this.delay(300);
       }
       
       // Attendre un petit délai pour que le loading s'affiche visuellement
       await this.delay(50);
       
-      // Ajouter un délai supplémentaire pour les transitions
-      await this.delay(this.pageTransitionDelay);
+      // Ajouter un délai supplémentaire pour les transitions (seulement si loading screen)
+      if (showLoading) {
+        await this.delay(this.pageTransitionDelay);
+      }
       
       // Nettoyer l'ancienne page
       this.cleanupOldPage();
@@ -191,13 +194,12 @@ class PageLoader {
       if (contentDiv) {
         contentDiv.innerHTML = html;
         
-        // Réinitialiser l'opacité avec transition
-        contentDiv.style.opacity = '0';
-        contentDiv.style.transition = 'opacity 0.4s ease-in';
+        // Remonter l'opacité à 1 (au cas où elle aurait été modifiée)
+        contentDiv.style.opacity = '1';
+        contentDiv.style.transition = originalTransition || 'opacity 0.4s ease-in';
         
         // Forcer le reflow pour déclencher la transition
         void contentDiv.offsetHeight;
-        contentDiv.style.opacity = '1';
         
         // Exécuter les scripts inline
         const scripts = Array.from(contentDiv.querySelectorAll('script'));
@@ -228,6 +230,8 @@ class PageLoader {
       
       const contentDiv = this.getContentDiv();
       if (contentDiv) {
+        // ✅ S'assurer que le contenu est visible même en cas d'erreur
+        contentDiv.style.opacity = '1';
         contentDiv.innerHTML = `
           <div style="
             padding: 40px 20px;
