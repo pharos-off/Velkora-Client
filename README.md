@@ -2,23 +2,9 @@
 
 Un launcher **Minecraft complet et moderne** offrant une expérience utilisateur exceptionnelle avec authentification Microsoft, gestion des profils, optimisation des ressources, et bien plus encore!
 
-![Version](https://img.shields.io/badge/version-4.2.9-blue.svg)
+![Version](https://img.shields.io/badge/version-4.3.1-blue.svg)
 ![License](https://img.shields.io/badge/license-VCv1-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-red.svg)
-
----
-
-## ⭐ VISUALISATION
-
-=> Page d'initialisation :
-<img width="1919" height="1031" alt="image" src="https://github.com/user-attachments/assets/fff6120d-71db-4a6b-907b-01ba4fb70c06" />
-
-=> Page de paramètres :
-<img width="1918" height="1029" alt="image" src="https://github.com/user-attachments/assets/e5187899-eb58-4f77-9948-eee4c4cc7a34" />
-
-=> Page principal :
-<img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/105b6a53-2db8-428b-a3e3-2f38d3dd4839" />
-
 
 ---
 
@@ -26,7 +12,7 @@ Un launcher **Minecraft complet et moderne** offrant une expérience utilisateur
 
 ### Depuis les releases
 
-1. Téléchargez la dernière version depuis [GitHub Releases](https://github.com/pharos-off/Velkora/releases)
+1. Téléchargez la dernière version depuis [GitHub Releases](https://github.com/pharos-off/Velkora-Client/releases)
 2. Exécutez l'installateur
 3. Lancez VelkoraMC !
 
@@ -66,8 +52,8 @@ Un launcher **Minecraft complet et moderne** offrant une expérience utilisateur
 ## 🐛 Bugs et suggestions
 
 Avez-vous trouvé un bug ou avez une suggestion ?
-- 📝 Ouvrez une [Issue](https://github.com/pharos-off/Velkora/issues)
-- 🤝 Créez une [Pull Request](https://github.com/pharos-off/Velkora/pulls)
+- 📝 Ouvrez une [Issue](https://github.com/pharos-off/Velkora-Client/issues)
+- 🤝 Créez une [Pull Request](https://github.com/pharos-off/Velkora-Client/pulls)
 
 ---
 
@@ -93,7 +79,7 @@ VelkoraMC est fourni sous la **Licence Velkora Client v1 (VCv1)**, une licence p
 ## 📞 Contact
 
 - **GitHub** : [@Pharsos](https://github.com/pharos-off)
-- **Discord** : [Rejoignez notre serveur communautaire](https://discord.gg/gPnY3hHCA2)
+- **Discord** : [Rejoignez notre serveur communautaire](https://discord.gg/zWx89wj5tF)
 
 ---
 
@@ -108,9 +94,9 @@ VelkoraMC est fourni sous la **Licence Velkora Client v1 (VCv1)**, une licence p
 
 ## 📊 Statistiques
 
-![GitHub Stars](https://img.shields.io/github/stars/pharos-off/Velkora?style=social)
-![GitHub Forks](https://img.shields.io/github/forks/pharos-off/Velkora?style=social)
-![GitHub Watchers](https://img.shields.io/github/watchers/pharos-off/Velkora?style=social)
+![GitHub Stars](https://img.shields.io/github/stars/pharos-off/Velkora-Client?style=social)
+![GitHub Forks](https://img.shields.io/github/forks/pharos-off/Velkora-Client?style=social)
+![GitHub Watchers](https://img.shields.io/github/watchers/pharos-off/Velkora-Client?style=social)
 
 ---
 
@@ -120,6 +106,6 @@ VelkoraMC est fourni sous la **Licence Velkora Client v1 (VCv1)**, une licence p
 
 Rejoignez notre communauté et aidez-nous à améliorer VelkoraMC !
 
-[⭐ Star sur GitHub](https://github.com/pharos-off/Velkora) • [🐛 Signaler un bug](https://github.com/pharos-off/Velkora/issues) • [💬 Discuter](https://github.com/pharos-off/Velkora/discussions)
+[⭐ Star sur GitHub](https://github.com/pharos-off/Velkora-Client) • [🐛 Signaler un bug](https://github.com/pharos-off/Velkora-Client/issues) • [💬 Discuter](https://github.com/pharos-off/Velkora-Client/discussions)
 
 </div>
