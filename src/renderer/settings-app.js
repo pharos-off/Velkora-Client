@@ -77,7 +77,6 @@ ipcRenderer.on('navigate-to-tab', (event, tabName) => {
     const tabButton = document.querySelector(`[data-tab="${tabName}"]`);
     if (tabButton) {
       tabButton.click();
-      console.log(`✅ Navigation vers l'onglet: ${tabName}`);
       if (tabName === 'discord') {
         setTimeout(() => {
           try {
@@ -163,22 +162,28 @@ async function loadAccountInfo() {
   }
 }
 
-// ✅ CACHE POUR LES INFOS DE STOCKAGE
+// ✅ CACHE POUR LES INFOS DE STOCKAGE (avec timeout pour éviter bloquer l'UI)
 let storageInfoCache = null;
 let lastStorageLoadTime = 0;
-const STORAGE_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+const STORAGE_CACHE_TIME = 15 * 60 * 1000; // 15 minutes (augmenté pour éviter calculs répétés)
 
 async function loadStorageInfo() {
   try {
     const now = Date.now();
     
-    // Ne recharger que toutes les 5 minutes
+    // Ne recharger que toutes les 15 minutes
     if (storageInfoCache && (now - lastStorageLoadTime) < STORAGE_CACHE_TIME) {
       displayStorageInfo(storageInfoCache);
       return;
     }
     
-    const storageInfo = await ipcRenderer.invoke('get-storage-info');
+    // ✅ Ajouter un timeout pour que le storage info n'attende pas plus de 5 secondes
+    const storageInfoPromise = ipcRenderer.invoke('get-storage-info');
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Storage info timeout')), 5000)
+    );
+    
+    const storageInfo = await Promise.race([storageInfoPromise, timeoutPromise]);
     
     if (storageInfo && storageInfo.success) {
       storageInfoCache = storageInfo;
@@ -186,7 +191,11 @@ async function loadStorageInfo() {
       displayStorageInfo(storageInfo);
     }
   } catch (error) {
-    console.error('Erreur chargement stockage:', error);
+    console.warn('Erreur chargement stockage (non bloquant):', error.message);
+    // Afficher une version en cache si disponible
+    if (storageInfoCache) {
+      displayStorageInfo(storageInfoCache);
+    }
   }
 }
 
@@ -275,7 +284,6 @@ async function loadDiscordSettings() {
 
 // ✅ Écouter les changements de statut Discord en temps réel
 ipcRenderer.on('discord-status-changed', (event, status) => {
-  console.log('📡 Discord status updated:', status);
   loadDiscordSettings();
 });
 
@@ -1256,22 +1264,53 @@ function renderSettings() {
 
   // ✅ TABS MENU
   document.querySelectorAll('.menu-category').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.menu-category').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+    btn.addEventListener('click', async () => {
+      // ✅ NE PAS RECHARGER SI DÉJÀ SUR CET ONGLET
+      if (btn.classList.contains('active')) return;
       
-      btn.classList.add('active');
-      const tabId = btn.dataset.tab + '-tab';
-      const section = document.getElementById(tabId);
-      if (section) section.style.display = 'block';
-      if (btn.dataset.tab === 'discord') {
-        setTimeout(() => {
-          try {
-            if (!discordTestManager) initDiscordTest();
-            const btnTest = document.getElementById('test-discord-btn');
-            if (btnTest) btnTest.click();
-          } catch (_) {}
-        }, 250);
+      // ✅ UTILISER LE PAGE LOADER POUR LA TRANSITION
+      if (window.pageLoader) {
+        const renderFunction = async () => {
+          document.querySelectorAll('.menu-category').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+          
+          btn.classList.add('active');
+          const tabId = btn.dataset.tab + '-tab';
+          const section = document.getElementById(tabId);
+          if (section) section.style.display = 'block';
+        };
+        
+        const setupFunction = () => {
+          if (btn.dataset.tab === 'discord') {
+            setTimeout(() => {
+              try {
+                if (!discordTestManager) initDiscordTest();
+                const btnTest = document.getElementById('test-discord-btn');
+                if (btnTest) btnTest.click();
+              } catch (_) {}
+            }, 250);
+          }
+        };
+        
+        await window.pageLoader.loadPage(renderFunction, setupFunction, true);
+      } else {
+        // Fallback sans PageLoader
+        document.querySelectorAll('.menu-category').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+        
+        btn.classList.add('active');
+        const tabId = btn.dataset.tab + '-tab';
+        const section = document.getElementById(tabId);
+        if (section) section.style.display = 'block';
+        if (btn.dataset.tab === 'discord') {
+          setTimeout(() => {
+            try {
+              if (!discordTestManager) initDiscordTest();
+              const btnTest = document.getElementById('test-discord-btn');
+              if (btnTest) btnTest.click();
+            } catch (_) {}
+          }, 250);
+        }
       }
     });
   });
@@ -1963,7 +2002,6 @@ function renderSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('✅ DOMContentLoaded started');
   try {
     ui.installStyles();
     console.log('✅ installStyles done');
@@ -1974,11 +2012,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (error) {
     console.error('Erreur lors du rendu:', error);
   }
-  await loadSettings();
-  await loadAccountInfo();
-  await loadStorageInfo();
-  await loadNotificationSettings();
-  await loadDiscordSettings();
+  
+  // ✅ CHARGER LES PARAMÈTRES EN PARALLÈLE POUR MEILLEURES PERFORMANCES
+  await Promise.all([
+    loadSettings(),
+    loadAccountInfo(),
+    loadStorageInfo(),
+    loadNotificationSettings(),
+    loadDiscordSettings()
+  ]);
   
   // ✅ INITIALISER LE GESTIONNAIRE DISCORD
   initDiscordTest();

@@ -63,7 +63,6 @@ class ElectronSecurity {
       });
     });
 
-    console.log('✅ Session sécurisée configurée');
   }
 
   /**
@@ -113,7 +112,6 @@ class ElectronSecurity {
 
     ipcMain.on('sensitive-data', (event, data) => {
       try {
-        console.log('🔐 Données sensibles reçues (non loggées)');
         event.reply('sensitive-data-response', { success: true });
       } catch (error) {
         event.reply('sensitive-data-response', {
@@ -148,8 +146,6 @@ class ElectronSecurity {
    */
   setupPermissions(sessionObj = session.defaultSession) {
     sessionObj.setPermissionRequestHandler((webContents, permission, callback) => {
-      console.log(`⚠️ Permission demandée: ${permission}`);
-
       const allowedPermissions = ['microphone', 'camera'];
       const isAllowed = allowedPermissions.includes(permission);
 
@@ -204,8 +200,6 @@ class ElectronSecurity {
         return { action: 'allow' };
       });
     }
-
-    console.log('✅ Sécurité Electron initialisée');
   }
 }
 

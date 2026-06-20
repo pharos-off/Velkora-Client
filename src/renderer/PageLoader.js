@@ -65,7 +65,6 @@ class PageLoader {
     // Démarrer l'animation de la barre de progression
     this.animateProgress();
     
-    console.log('📱 [PageLoader] Loading screen shown');
   }
 
   /**
@@ -87,7 +86,6 @@ class PageLoader {
         ls.classList.add('hidden');
       }
       this.isLoading = false;
-      console.log('📱 [PageLoader] Loading screen hidden');
     }, remainingTime);
   }
 
@@ -225,7 +223,6 @@ class PageLoader {
         this.hide();
       }
       
-      console.log('📱 [PageLoader] Page loaded successfully');
     } catch (error) {
       console.error('❌ [PageLoader] Error loading page:', error);
       
@@ -295,7 +292,6 @@ class PageLoader {
       // Nettoyer le contenu
       contentDiv.innerHTML = '';
       
-      console.log('📱 [PageLoader] Old page cleaned up');
     } catch (error) {
       console.error('[Cleanup] Error during page cleanup:', error);
     }

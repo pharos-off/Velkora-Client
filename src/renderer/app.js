@@ -1,4 +1,4 @@
-let ipcRenderer;
+﻿let ipcRenderer;
 try {
   if (window && window.electron && window.electron.ipcRenderer) {
     ipcRenderer = window.electron.ipcRenderer;
@@ -177,7 +177,6 @@ class CraftLauncherApp {
     this.applyAccentColor(recommendedAccent);
     
     this.applyThemePalette(theme);
-    console.log(`[Theme] Applied: ${theme}`, window.themeManager?.getConsoleStyles());
   }
 
   applyThemePalette(theme) {
@@ -216,7 +215,6 @@ class CraftLauncherApp {
     }
     localStorage.setItem('accent', accent);
     document.documentElement.setAttribute('data-accent', accent);
-    console.log(`[Accent] Applied: ${accent}`);
   }
 
   /**
@@ -414,17 +412,13 @@ class CraftLauncherApp {
 
   async init() {
     try {
-      console.log('📱 [RENDERER] init() called');
       // ✅ CHARGER LE THÈME EN PREMIER (avant le rendu)
       this.loadTheme();
       
-      console.log('📱 [RENDERER] Loading data...');
       this.features = new LauncherFeatures(this);
       await this.loadData();
       
-      console.log('📱 [RENDERER] Data loaded, authData:', this.authData ? `${this.authData.username} (${this.authData.uuid})` : 'NULL');
       this.render();
-      console.log('📱 [RENDERER] render() completed');
       //this.setupRadioWidget();
       this.setupEventListeners();
       await this.features.setupProfileEvents();
@@ -449,7 +443,7 @@ class CraftLauncherApp {
             });
           }
         } catch (error) {
-          console.log('⚠️ Error checking updates:', error);
+          // Silent error catch
         }
       }, 2000);
       
@@ -457,7 +451,6 @@ class CraftLauncherApp {
       window.dispatchEvent(new CustomEvent('app-ready', { 
         detail: { app: this, theme: this.themePresets } 
       }));
-      console.log('✅ [Init] App successfully initialized');
     } catch (error) {
       console.error('❌ [Init] Initialization error:', error);
       this.ui.showToast({
@@ -472,7 +465,6 @@ class CraftLauncherApp {
   }
 
   async loadData() {
-    console.log('📱 [RENDERER] loadData() started');
     const [
       authData,
       profiles,
@@ -486,12 +478,6 @@ class CraftLauncherApp {
       ipcRenderer.invoke('get-system-ram'),
       ipcRenderer.invoke('get-friends')
     ]);
-
-    console.log('📱 [RENDERER] Received authData:', authData ? `${authData.username} (${authData.uuid})` : 'NULL');
-    console.log('📱 [RENDERER] Received profiles:', profiles ? profiles.length + ' profiles' : 'NULL');
-    console.log('📱 [RENDERER] Received settings:', settings ? 'OK' : 'NULL');
-    console.log('📱 [RENDERER] Received maxRam:', maxRam);
-    console.log('📱 [RENDERER] Received friends:', friends ? friends.length + ' friends' : 'NULL');
 
     this.authData = authData;
     if (this.authData) {
@@ -526,11 +512,21 @@ class CraftLauncherApp {
       const newsCardItem = e.target.closest('.news-card-item');
       const viewAllNewsBtn = e.target.closest('#view-all-news-btn');
       const newsletterBtn = e.target.closest('#newsletter-btn');
+      const aboutLink = e.target.closest('#about-link');
+      const licenseLink = e.target.closest('#license-link');
       
       if (minimizeBtn) ipcRenderer.send('minimize-window');
       else if (maximizeBtn) ipcRenderer.send('maximize-window');
       else if (closeBtn) ipcRenderer.send('close-window');
       else if (radioBtn) this.openRadioPlayer();
+      // ✅ LIEN À PROPOS
+      else if (aboutLink) {
+        ipcRenderer.send('open-settings', { tab: 'about' });
+      }
+      // ✅ LIEN LICENCE
+      else if (licenseLink) {
+        ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/blob/main/LICENSE');
+      }
       // ✅ LISTENER POUR LES ACTUALITÉS
       else if (newsCardItem) {
         e.preventDefault();
@@ -566,11 +562,11 @@ class CraftLauncherApp {
       }
       else if (e.target.classList.contains('bug-report-btn')) {
         // Ouvrir le lien GitHub pour créer un rapport
-        ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora/issues/new');
+        ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/issues/new');
       }
       else if (e.target.classList.contains('pr-request-btn')) {
         // Ouvrir le lien GitHub pour les pull requests
-        ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora/pulls');
+        ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/pulls');
       }
     });
 
@@ -636,19 +632,15 @@ class CraftLauncherApp {
   }
 
   render(forceRerender = false) {
-    console.log('📱 [RENDERER] render() called - authData:', this.authData ? `${this.authData.username}` : 'NULL');
     const appContainer = document.getElementById('app');
     if (!this.authData) {
-      console.log('📱 [RENDERER] authData is NULL, switching to login view');
       this.currentView = 'login';
     } else {
-      console.log('📱 [RENDERER] authData found, keeping current view:', this.currentView);
       if (!this.currentView || this.currentView === 'login') {
         this.currentView = 'main';
       }
     }
     if (this.currentView === 'login') {
-      console.log('📱 [RENDERER] Rendering LOGIN view');
       appContainer.innerHTML = this.renderLogin();
       this.setupLoginEvents();
       this.lastRenderedView = 'login'; // ✅ Mettre à jour la dernière vue rendue
@@ -745,7 +737,6 @@ class CraftLauncherApp {
 
     // ✅ VÉRIFIER SI LA VUE N'A PAS CHANGÉ (sauf si forceRerender)
     if (!forceRerender && this.currentView === this.lastRenderedView) {
-      console.log(`📱 [RENDERER] Même vue (${this.currentView}), pas de rechargement`);
       this.pageLoader.hide(); // ✅ Cacher le loading screen si montré
       return;
     }
@@ -863,6 +854,12 @@ renderMainLayout() {
                 <span class="menu-icon"><i class="bi bi-gear"></i></span> Paramètres
               </button>
             </div>
+          </div>
+
+          <div style="padding: 16px; border-top: 1px solid rgba(99, 102, 241, 0.1); text-align: center; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+            <span id="about-link" style="color: #cbd5e1; font-size: 12px; cursor: pointer; transition: all 0.3s; text-decoration: none;">À propos</span>
+            <span style="color: #475569; display: flex; align-items: center;">|</span>
+            <span id="license-link" style="color: #cbd5e1; font-size: 12px; cursor: pointer; transition: all 0.3s; text-decoration: none;">Licence</span>
           </div>
         </div>
 
@@ -1393,8 +1390,193 @@ renderMainLayout() {
         return packContent;
       case 'theme': return this.renderThemeSettings();
       case 'help': return this.renderHelp();
+      case 'about': return this.renderAbout();
+      case 'license': return this.renderLicense();
       default: return '';
     }
+  }
+
+  renderAbout() {
+    return `
+      <div class="view-container" style="padding: 40px;">
+        <!-- 📋 HEADER PRINCIPAL -->
+        <div class="view-header" style="margin-bottom: 40px;">
+          <h1 class="view-title" style="display: flex; align-items: center; gap: 12px; font-size: 32px; margin: 0 0 8px 0;"><span style="display: flex;">${icons.info}</span> À propos de ${LauncherVersion.getName()}</h1>
+          <p style="color: #94a3b8; margin: 0; font-size: 16px;">Tout ce que tu dois savoir sur ce launcher</p>
+        </div>
+
+        <!-- 🎯 INFOS PRINCIPALES -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 40px;">
+          <!-- VERSION -->
+          <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 14px; padding: 24px;">
+            <div style="font-size: 20px; margin-bottom: 12px; display: flex;">${icons.pin}</div>
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">Version</h3>
+            <p style="color: #cbd5e1; margin: 0; font-size: 14px;">v${LauncherVersion.version}</p>
+          </div>
+
+          <!-- DÉVELOPPEUR -->
+          <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 24px;">
+            <div style="font-size: 20px; margin-bottom: 12px; display: flex;">${icons.user}</div>
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">Développeur</h3>
+            <p style="color: #cbd5e1; margin: 0; font-size: 14px;">@pharos-off</p>
+          </div>
+
+          <!-- PLATEFORME -->
+          <div style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(236, 72, 153, 0.1) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 14px; padding: 24px;">
+            <div style="font-size: 20px; margin-bottom: 12px; display: flex;">${icons.globe}</div>
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">Plateforme</h3>
+            <p style="color: #cbd5e1; margin: 0; font-size: 14px;">Electron + Node.js</p>
+          </div>
+        </div>
+
+        <!-- 📝 DESCRIPTION -->
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 30px;">
+          <h2 style="color: #e2e8f0; margin: 0 0 12px 0; font-size: 18px; font-weight: 700;">Qu'est-ce que ${LauncherVersion.getName()} ?</h2>
+          <p style="color: #cbd5e1; line-height: 1.8; margin: 0; font-size: 14px;">
+            ${LauncherVersion.getName()} est un launcher Minecraft moderne et performant qui te permet de :
+          </p>
+          <ul style="color: #cbd5e1; line-height: 1.8; margin: 16px 0 0 0; padding-left: 20px; font-size: 14px;">
+            <li>🎮 Lancer Minecraft avec style et performance</li>
+            <li>📦 Installer et gérer tes mods facilement</li>
+            <li>🎨 Personnaliser l'interface comme tu veux</li>
+            <li>⚙️ Optimiser ton expérience de jeu</li>
+            <li>🤝 Jouer en multijoueur sur n'importe quel serveur</li>
+            <li>💬 Intégration Discord Rich Presence</li>
+            <li>🔒 Authentification sécurisée Microsoft</li>
+          </ul>
+        </div>
+
+        <!-- ✨ FONCTIONNALITÉS CLÉS -->
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #e2e8f0; margin: 0 0 20px 0; font-size: 18px; font-weight: 700;">Fonctionnalités principales</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #6366f1; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.zap} Rapide & Performant</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Launcher ultra-optimisé pour les meilleures performances</p>
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #a855f7; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.palette} Très personnalisable</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Thèmes et couleurs à volonté pour ton style</p>
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #3b82f6; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.heart} Open Source</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Code public sur GitHub, modifiable par tous</p>
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #06b6d4; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.lock} Sécurisé</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Authentification Microsoft sécurisée</p>
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #22c55e; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.messageSquare} Support Communauté</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Aide active sur Discord et GitHub</p>
+            </div>
+            <div style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid #f59e0b; border-radius: 8px; padding: 20px;">
+              <h4 style="color: #e2e8f0; margin: 0 0 8px 0; font-weight: 700; font-size: 14px;">${icons.download} 100% Gratuit</h4>
+              <p style="color: #cbd5e1; margin: 0; font-size: 13px;">Aucun frais, aucune pub, aucun tracker</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🔗 LIENS UTILES -->
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 28px; text-align: center;">
+          <h3 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 16px; font-weight: 700;">Retrouve-nous en ligne</h3>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button id="about-github-btn" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 700; cursor: pointer; border: none; display: flex; align-items: center; gap: 8px; transition: all 0.3s;">
+              ${icons.download} GitHub
+            </button>
+            <button id="about-discord-btn" style="background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 700; cursor: pointer; border: none; display: flex; align-items: center; gap: 8px; transition: all 0.3s;">
+              ${icons.messageSquare} Discord
+            </button>
+          </div>
+        </div>
+
+        <!-- 💙 MERCI -->
+        <div style="text-align: center; margin-top: 40px; padding: 24px;">
+          <p style="color: #cbd5e1; font-size: 14px; line-height: 1.8;">
+            <span style="display: flex; font-size: 24px; justify-content: center; margin-bottom: 12px;">${icons.heart}</span>
+            Merci d'utiliser ${LauncherVersion.getName()} !<br/>
+            <span style="color: #94a3b8; font-size: 13px;">Rejoins la communauté et aide-nous à l'améliorer</span>
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  renderLicense() {
+    return `
+      <div class="view-container" style="padding: 40px;">
+        <!-- 📋 HEADER PRINCIPAL -->
+        <div class="view-header" style="margin-bottom: 40px;">
+          <h1 class="view-title" style="display: flex; align-items: center; gap: 12px; font-size: 32px; margin: 0 0 8px 0;"><span style="display: flex;">${icons.clipboard}</span> Licence du projet</h1>
+          <p style="color: #94a3b8; margin: 0; font-size: 16px;">${LauncherVersion.getName()} est open-source sous licence MIT</p>
+        </div>
+
+        <!-- 📜 TEXTE DE LA LICENCE -->
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 28px; margin-bottom: 30px;">
+          <h2 style="color: #e2e8f0; margin: 0 0 16px 0; font-size: 18px; font-weight: 700;">MIT License</h2>
+          <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 8px; padding: 20px; font-family: monospace; font-size: 12px; color: #a78bfa; line-height: 1.6; overflow-x: auto;">
+            Copyright (c) 2024 - pharos-off<br/><br/>
+            Permission is hereby granted, free of charge, to any person obtaining a copy<br/>
+            of this software and associated documentation files (the "Software"), to deal<br/>
+            in the Software without restriction, including without limitation the rights<br/>
+            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell<br/>
+            copies of the Software, and to permit persons to whom the Software is<br/>
+            furnished to do so, subject to the following conditions:<br/><br/>
+            The above copyright notice and this permission notice shall be included in all<br/>
+            copies or substantial portions of the Software.<br/><br/>
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR<br/>
+            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,<br/>
+            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE<br/>
+            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER<br/>
+            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,<br/>
+            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE<br/>
+            SOFTWARE.
+          </div>
+        </div>
+
+        <!-- ℹ️ EXPLICATION DE LA LICENCE MIT -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+          <div style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(22, 163, 74, 0.1) 100%); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 12px; padding: 24px;">
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 15px; font-weight: 700;">✅ Tu as le droit de :</h3>
+            <ul style="color: #cbd5e1; margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.8;">
+              <li>Utiliser le logiciel</li>
+              <li>Copier et modifier</li>
+              <li>Distribuer tes versions</li>
+              <li>Utiliser à titre commercial</li>
+              <li>Utiliser en privé</li>
+            </ul>
+          </div>
+
+          <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 24px;">
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 15px; font-weight: 700;">❌ Tu dois :</h3>
+            <ul style="color: #cbd5e1; margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.8;">
+              <li>Inclure la licence</li>
+              <li>Inclure l'avis de copyright</li>
+              <li>Documenter tes changements</li>
+              <li>Ne pas chercher recours</li>
+            </ul>
+          </div>
+
+          <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.1) 100%); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; padding: 24px;">
+            <h3 style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 15px; font-weight: 700;">📌 Conditions :</h3>
+            <ul style="color: #cbd5e1; margin: 0; padding-left: 16px; font-size: 13px; line-height: 1.8;">
+              <li>Pas de garantie fournie</li>
+              <li>Pas de responsabilité en cas de dommage</li>
+              <li>Licence permissive</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 🔗 EN SAVOIR PLUS -->
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 28px; text-align: center;">
+          <h3 style="color: #e2e8f0; margin: 0 0 12px 0; font-size: 16px; font-weight: 700;">Voir le projet complet sur GitHub</h3>
+          <p style="color: #cbd5e1; margin: 0 0 16px 0; font-size: 14px;">Retrouve le code source complet, les issues et les pull requests</p>
+          <button id="license-github-btn" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 700; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s;">
+            ${icons.download} Aller à GitHub
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   normalizeViewName(view) {
@@ -1504,56 +1686,6 @@ renderMainLayout() {
     
     return `
       <style>
-        .dev-status-banner {
-          margin: 20px 0;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
-          border: 1px solid rgba(59, 130, 246, 0.2);
-          border-radius: 12px;
-          padding: 16px;
-          position: relative;
-        }
-        .banner-content {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-        .banner-icon {
-          color: #3b82f6;
-          flex-shrink: 0;
-          margin-top: 2px;
-        }
-        .banner-text {
-          flex: 1;
-          font-size: 14px;
-          line-height: 1.5;
-          color: #e2e8f0;
-        }
-        .banner-text strong {
-          color: #60a5fa;
-        }
-        .banner-close {
-          background: none;
-          border: none;
-          color: #94a3b8;
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 4px;
-          transition: all 0.2s;
-          flex-shrink: 0;
-        }
-        .banner-close:hover {
-          background: rgba(148, 163, 184, 0.1);
-          color: #cbd5e1;
-        }
-        @media (max-width: 768px) {
-          .banner-content {
-            flex-direction: column;
-            gap: 8px;
-          }
-          .banner-text {
-            font-size: 13px;
-          }
-        }
       </style>
       <div class="home-view-modern">
         <!-- Hero Section avec Avatar -->
@@ -1582,27 +1714,6 @@ renderMainLayout() {
           </div>
         </div>
 
-        <!-- Bannière d'information sur le développement -->
-        <div class="dev-status-banner">
-          <div class="banner-content">
-            <div class="banner-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-            </div>
-            <div class="banner-text">
-              <strong>Fin du développement majeur</strong> - Le launcher Velkora a atteint la fin de ses grandes fonctionnalités. Seules des corrections de bugs sont désormais planifiées. Les grosses mises à jour ne sont pas envisagées (pour le moment). GitHub reste disponible pour proposer des fonctionnalités et signaler des bugs.
-            </div>
-            <button class="banner-close" onclick="this.parentElement.parentElement.style.display='none'">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
 
         <!-- Carte de Lancement Principale -->
         <div class="main-launch-card">
@@ -2586,14 +2697,14 @@ renderMainLayout() {
 
       if (historyBtn) {
         historyBtn.addEventListener('click', () => {
-          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora/releases');
+          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/releases');
           this.ui.showToast({ title: 'Historique', message: 'Ouverture de la page des releases', type: 'info' });
         });
       }
 
       if (changelogBtn) {
         changelogBtn.addEventListener('click', () => {
-          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora/blob/main/CHANGELOG.md');
+          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/blob/main/CHANGELOG.md');
           this.ui.showToast({ title: 'Changelog', message: 'Ouverture du changelog', type: 'info' });
         });
       }
@@ -2605,11 +2716,11 @@ renderMainLayout() {
   renderPartnersView() {
     const partners = [
       { 
-        name: 'PharosSMP',
+        name: 'Noctem | Minecraft Server',
         logo: icons.shield,
-        description: 'Un serveur SMP privé pour les membres de la communauté Pharos',
-        website: 'http://176.161.97.30',
-        joinUrl: '176.161.97.30'
+        description: 'Un serveur Minecraft publique pour les fans de LIFESTEAL, SURVIE, PVP et bien plus !',
+        website: '',
+        joinUrl: ''
       },
       { 
         name: 'LunaVerse',
@@ -3419,12 +3530,19 @@ renderMainLayout() {
         
         // ✅ Ne pas recharger si on est déjà sur cette vue (avec String pour robustesse)
         if (String(view).toLowerCase() === String(this.lastRenderedView).toLowerCase()) {
-          console.log(`📱 [RENDERER] Déjà sur la page ${view}, pas de rechargement`);
           return;
         }
         
+        // Cas spécial pour À propos (naviguer vers settings)
+        if (view === 'about') {
+          ipcRenderer.send('open-settings', { tab: 'about' });
+        }
+        // Cas spécial pour Licence (ouvrir GitHub)
+        else if (view === 'license') {
+          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/blob/main/LICENSE');
+        }
         // Cas spécial pour Paramètres
-        if (view === 'settings') {
+        else if (view === 'settings') {
           this.currentView = 'main';
           this.render();
           ipcRenderer.send('open-settings');
@@ -3438,7 +3556,6 @@ renderMainLayout() {
       const themeBtn = e.target.closest('.theme-option');
       if (themeBtn) {
         const theme = themeBtn.dataset.theme;
-        console.log('[Theme] Switching to:', theme);
         localStorage.setItem('theme', theme);
         this.applyThemeSelection(theme);
         this.render();
@@ -3448,7 +3565,6 @@ renderMainLayout() {
       const accentBtn = e.target.closest('.accent-option');
       if (accentBtn) {
         const accent = accentBtn.dataset.accent;
-        console.log('[Accent] Switching to:', accent);
         localStorage.setItem('accent', accent);
         this.applyAccentColor(accent);
       }
@@ -3495,7 +3611,6 @@ renderMainLayout() {
           e.stopPropagation();
           const theme = btn.dataset.theme;
           if (!theme) return;
-          console.log('[Theme] Direct click handler:', theme);
           localStorage.setItem('theme', theme);
           this.applyThemeSelection(theme);
           this.render();
@@ -3509,7 +3624,6 @@ renderMainLayout() {
           e.stopPropagation();
           const accent = btn.dataset.accent;
           if (!accent) return;
-          console.log('[Accent] Direct click handler:', accent);
           localStorage.setItem('accent', accent);
           this.applyAccentColor(accent);
         });
@@ -3535,7 +3649,6 @@ renderMainLayout() {
       if (blurToggle && !blurToggle._themeListenerAdded) {
         blurToggle._themeListenerAdded = true;
         blurToggle.addEventListener('change', (e) => {
-          console.log('[Blur] Changed to:', e.target.checked);
           localStorage.setItem('blur-background', e.target.checked);
           document.documentElement.setAttribute('data-blur', e.target.checked);
         });
@@ -3544,7 +3657,6 @@ renderMainLayout() {
       if (animToggle && !animToggle._themeListenerAdded) {
         animToggle._themeListenerAdded = true;
         animToggle.addEventListener('change', (e) => {
-          console.log('[Anim] Changed to:', e.target.checked);
           localStorage.setItem('animations', e.target.checked);
           document.documentElement.setAttribute('data-animations', e.target.checked);
         });
@@ -3553,7 +3665,6 @@ renderMainLayout() {
       if (transToggle && !transToggle._themeListenerAdded) {
         transToggle._themeListenerAdded = true;
         transToggle.addEventListener('change', (e) => {
-          console.log('[Trans] Changed to:', e.target.checked);
           localStorage.setItem('transparency', e.target.checked);
           document.documentElement.setAttribute('data-transparency', e.target.checked);
         });
@@ -3577,7 +3688,6 @@ renderMainLayout() {
 
     // 🎮 SIGNAL QUAND LE JEU FERME
     ipcRenderer.on('game-closed', (event, { code }) => {
-      console.log(`Le jeu a fermé avec le code: ${code}`);
       const launchBtn = document.getElementById('launch-btn');
       if (launchBtn) {
         launchBtn.disabled = false;
@@ -3652,7 +3762,6 @@ renderMainLayout() {
 
     // ✅ ÉCOUTER LE SIGNAL DE DÉCONNEXION DEPUIS LES PARAMÈTRES
     this.addTrackedListener('logout-from-settings', async () => {
-      console.log('📡 Disconnect signal received');
       
       this.currentView = 'login';
       this.authData = null;
@@ -3662,8 +3771,6 @@ renderMainLayout() {
       this.selectedProfile = null;
       
       this.render();
-      
-      console.log('✅ Return to login page');
     });
 
     // ✅ ÉCOUTER LES MISES À JOUR DE PROGRESSION
@@ -3687,14 +3794,12 @@ renderMainLayout() {
 
     // ✅ ÉCOUTER LES CHANGEMENTS DE PARAMÈTRES
     this.addTrackedListener('settings-updated', (event, newSettings) => {
-      console.log('⚡ Settings updated in real-time:', newSettings);
       this.settings = newSettings;
       
       // ✅ Mettre à jour le badge RAM IMMÉDIATEMENT
       const ramBadge = document.getElementById('ram-badge-display');
       if (ramBadge) {
         ramBadge.textContent = `${newSettings.ramAllocation || 4} GB RAM`;
-        console.log('✅ RAM badge updated to:', newSettings.ramAllocation);
       }
       
       // Mettre à jour aussi dans le header si nécessaire
@@ -3724,7 +3829,6 @@ renderMainLayout() {
       homeStorageBtn.addEventListener('click', async () => {
         const result = await ipcRenderer.invoke('open-minecraft-folder');
         if (result.success) {
-          console.log('✅ Dossier Minecraft ouvert');
         }
       });
     }
@@ -3868,7 +3972,6 @@ renderMainLayout() {
           this.selectedProfile = this.profiles.find(profile => profile.id === result.profile?.id) || result.profile;
           this.selectedLaunchLoader = 'vanilla';
           await this.renderContentAsync();
-          console.log('✅ Version changed:', version);
         }
       } catch (error) {
         console.error('Erreur changement version:', error);
@@ -4226,6 +4329,21 @@ renderMainLayout() {
     document.getElementById('help-github-project-btn')?.addEventListener('click', () => {
       window.electron.shell.openExternal('https://github.com/velkora/launcher');
     });
+
+    // ✅ BOUTONS À PROPOS
+    document.getElementById('about-github-btn')?.addEventListener('click', () => {
+      window.electron.shell.openExternal('https://github.com/velkora/launcher');
+    });
+
+    document.getElementById('about-discord-btn')?.addEventListener('click', () => {
+      window.electron.shell.openExternal('https://discord.gg/rCFBHZencT');
+    });
+
+    // ✅ BOUTONS LICENCE
+    document.getElementById('license-github-btn')?.addEventListener('click', () => {
+      window.electron.shell.openExternal('https://github.com/velkora/launcher');
+    });
+
   }
 
   getRadioStations() {
@@ -4784,7 +4902,6 @@ renderMainLayout() {
       const result = await ipcRenderer.invoke('get-featured-news');
       if (result.success) {
         this.news = result.news;
-        console.log(`Actualités chargées: ${this.news.length}`);
       } else {
         console.warn('⚠️ Impossible de charger les actualités');
         this.news = [];
@@ -4889,7 +5006,6 @@ renderMainLayout() {
     const selectedTheme = String(theme || 'dark');
     const preset = this.themePresets[selectedTheme] || this.themePresets.dark;
 
-    console.log('[Theme] Applying theme:', selectedTheme);
     localStorage.setItem('theme', selectedTheme);
 
     root.style.setProperty('--theme-background', preset.background);
@@ -4932,7 +5048,6 @@ renderMainLayout() {
     const root = document.documentElement;
     const accentColor = this.accentColors[accent] || this.accentColors.indigo;
 
-    console.log('[Accent] Applying accent:', accent, accentColor);
     localStorage.setItem('accent', accent);
 
     root.style.setProperty('--theme-accent', accentColor);

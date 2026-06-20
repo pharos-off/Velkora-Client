@@ -1,6 +1,6 @@
 {
   "name": "velkora-client",
-  "version": "4.2.9",
+  "version": "4.3.1",
   "description": "Launcher Minecraft",
   "main": "src/main/index.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "build:mac": "npm run copy-assets && electron-builder --mac",
     "build:linux": "npm run copy-assets && electron-builder --linux"
   },
-  "author": "Pharos",
+  "author": "Velkora Team",
   "license": "CLv1",
   "dependencies": {
     "adm-zip": "^0.5.10",

@@ -32,8 +32,8 @@ const networkManager = new NetworkManager({
 });
 
 
-const LAUNCHER_VERSION = '4.2.9';
-const LAUNCHER_BUILD = '20260527';
+const LAUNCHER_VERSION = '4.3.1';
+const LAUNCHER_BUILD = '20260620';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {
@@ -1060,7 +1060,7 @@ async function initializeDiscord() {
     
     // Créer l'instance Discord
     discordRPC = new DiscordPresence({
-      clientId: '1476358132623212699',
+      clientId: '1511773943839588455',
       autoReconnect: false,
       reconnectDelay: 5000,
       maxReconnectAttempts: 10
@@ -1103,26 +1103,6 @@ async function initializeDiscord() {
 }
 
 // ==================== APP LIFECYCLE ====================
-
-// Initialiser Discord au démarrage de l'app
-app.whenReady().then(async () => {
-  // ... ton code existant ...
-  
-  // Appliquer le démarrage automatique selon les paramètres sauvegardés
-  try {
-    const saved = store.get('settings', {});
-    const startup = !!saved.startupOnBoot;
-    app.setLoginItemSettings({ openAtLogin: startup, path: process.execPath });
-  } catch (_) {}
-  
-  // Initialiser Discord RPC
-  const discordEnabled = store.get('discord.rpcEnabled', true);
-  if (discordEnabled) {
-    await initializeDiscord();
-  }
-  
-  // ... reste de ton code ...
-});
 
 // Nettoyer Discord à la fermeture
 app.on('before-quit', async () => {
@@ -1263,7 +1243,13 @@ app.whenReady().then(async () => {
   // ✅ Démarrer le timer de renouvellement automatique du token
   startTokenRefreshTimer();
 
-  
+  // Appliquer le démarrage automatique selon les paramètres sauvegardés
+  try {
+    const saved = store.get('settings', {});
+    const startup = !!saved.startupOnBoot;
+    app.setLoginItemSettings({ openAtLogin: startup, path: process.execPath });
+  } catch (_) {}
+
   // ✅ Retarder la création de la fenêtre principale pour laisser le loading screen s'afficher
   setTimeout(() => {
     createWindow();
@@ -1496,95 +1482,109 @@ ipcMain.handle('get-storage-info', async () => {
     if (!fs.existsSync(gameDir)) {
       fs.mkdirSync(gameDir, { recursive: true });
     }
-    
-    // Vérifier que le dossier existe
-    if (!fs.existsSync(gameDir)) {
-      fs.mkdirSync(gameDir, { recursive: true });
-    }
-
-    // Utiliser du command pour calculer la taille (beaucoup plus rapide)
-    const { exec } = require('child_process');
-    // Sanitize path for PowerShell single-quoted string by doubling single quotes
-    const safeGameDir = String(gameDir || '').replace(/'/g, "''");
 
     return new Promise((resolve) => {
-      exec(`powershell -Command "Get-ChildItem -Path '${safeGameDir}' -Recurse | Measure-Object -Property Length -Sum | Select-Object @{Name='Size';Expression={$_.Sum}}"`, 
-        { encoding: 'utf8' },
-        (error, stdout, stderr) => {
+      // ✅ Calculer la taille de manière plus efficace
+      const getQuickSize = (dir, maxDepth = 2) => {
+        let size = 0;
+        const stack = [{ path: dir, depth: 0 }];
+        
+        while (stack.length > 0) {
+          const { path: currentPath, depth } = stack.pop();
+          
+          if (depth > maxDepth) continue;
+          
           try {
-            let usedBytes = 0;
-            
-            if (!error && stdout) {
-              // Parser la sortie PowerShell
-              const sizeMatch = stdout.match(/\d+/);
-              if (sizeMatch) {
-                usedBytes = parseInt(sizeMatch[0]);
+            const files = fs.readdirSync(currentPath);
+            for (const file of files) {
+              try {
+                const filePath = path.join(currentPath, file);
+                const stat = fs.statSync(filePath);
+                
+                if (stat.isDirectory() && depth < maxDepth) {
+                  stack.push({ path: filePath, depth: depth + 1 });
+                } else if (stat.isFile()) {
+                  size += stat.size;
+                }
+              } catch (e) {
+                // Ignorer les fichiers non accessibles
               }
             }
-            
-            // Si PowerShell échoue, utiliser une fonction rapide (sans récursion complète)
-            if (usedBytes === 0) {
-              const getApproxSize = (dir, depth = 0) => {
-                if (depth > 3) return 0; // Limiter la profondeur
-                let size = 0;
-                
-                try {
-                  const files = fs.readdirSync(dir);
-                  files.forEach(file => {
-                    try {
-                      const filePath = path.join(dir, file);
-                      const stat = fs.statSync(filePath);
-                      
-                      if (stat.isDirectory() && depth < 3) {
-                        size += getApproxSize(filePath, depth + 1);
-                      } else {
-                        size += stat.size;
-                      }
-                    } catch (e) {
-                      // Ignorer les fichiers non accessibles
-                    }
-                  });
-                } catch (e) {
-                  // Ignorer les dossiers non accessibles
-                }
-                
-                return size;
-              };
-              
-              usedBytes = getApproxSize(gameDir);
-            }
-            
-            const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
-
-            // Obtenir l'espace disque du lecteur
-            si.fsSize().then(diskInfo => {
-              const drive = diskInfo.find(d => gameDir.startsWith(d.mount)) || diskInfo[0];
-              
-              const totalGB = (drive.size / (1024 * 1024 * 1024)).toFixed(2);
-              const freeGB = (drive.available / (1024 * 1024 * 1024)).toFixed(2);
-
-              const result = {
-                success: true,
-                gamePath: gameDir,
-                usedGB: parseFloat(usedGB),
-                totalGB: parseFloat(totalGB),
-                freeGB: parseFloat(freeGB)
-              };
-              
-              // Mettre en cache
-              storageInfoCache = result;
-              lastStorageUpdate = now;
-              
-              resolve(result);
-            });
-          } catch (err) {
-            resolve({
-              success: false,
-              error: 'Erreur calcul stockage'
-            });
+          } catch (e) {
+            // Ignorer les dossiers non accessibles
           }
         }
-      );
+        
+        return size;
+      };
+      
+      try {
+        // Utiliser le calcul rapide en premier
+        const usedBytes = getQuickSize(gameDir, 3);
+        const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+        
+        // ✅ Obtenir l'espace disque de manière plus rapide
+        si.fsSize().then(diskInfo => {
+          try {
+            const drive = diskInfo.find(d => {
+              try {
+                return gameDir.toLowerCase().startsWith(d.mount.toLowerCase());
+              } catch (e) {
+                return false;
+              }
+            }) || diskInfo[0];
+            
+            const totalGB = (drive.size / (1024 * 1024 * 1024)).toFixed(2);
+            const freeGB = (drive.available / (1024 * 1024 * 1024)).toFixed(2);
+            
+            const result = {
+              success: true,
+              gamePath: gameDir,
+              usedGB: parseFloat(usedGB),
+              totalGB: parseFloat(totalGB),
+              freeGB: parseFloat(freeGB)
+            };
+            
+            // Mettre en cache
+            storageInfoCache = result;
+            lastStorageUpdate = now;
+            
+            resolve(result);
+          } catch (err) {
+            // Retourner le résultat même si fsSize échoue
+            const result = {
+              success: true,
+              gamePath: gameDir,
+              usedGB: parseFloat(usedGB),
+              totalGB: 0,
+              freeGB: 0
+            };
+            
+            storageInfoCache = result;
+            lastStorageUpdate = now;
+            resolve(result);
+          }
+        }).catch(err => {
+          // Retourner le résultat partiel
+          const result = {
+            success: true,
+            gamePath: gameDir,
+            usedGB: parseFloat(usedGB),
+            totalGB: 0,
+            freeGB: 0
+          };
+          
+          storageInfoCache = result;
+          lastStorageUpdate = now;
+          resolve(result);
+        });
+      } catch (err) {
+        // En cas d'erreur, retourner un résultat vide
+        resolve({
+          success: false,
+          error: 'Erreur calcul stockage'
+        });
+      }
     });
   } catch (error) {
     console.error('Error retrieving storage:', error);

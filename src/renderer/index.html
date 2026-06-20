@@ -1026,6 +1026,18 @@
       box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     }
 
+    /* ✅ FOOTER LINKS */
+    [data-view]:not(.menu-item):not([disabled]) {
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    [data-view]:not(.menu-item):not([disabled]):hover {
+      color: #6366f1;
+      text-decoration: underline;
+    }
+
     /* ✅ MAIN CONTENT */
     .main-content {
       flex: 1;
@@ -2479,8 +2491,6 @@
       overflow: hidden;
     }
 
-    
-
 </style>
 </head>
 <body>
@@ -2536,6 +2546,7 @@
     </div>
   </div>
   <div id="app"></div>
+
   <script>
     (function () {
       var loading = document.getElementById('loading-screen');

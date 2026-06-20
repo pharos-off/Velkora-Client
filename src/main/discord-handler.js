@@ -10,8 +10,6 @@ let currentDiscordRPC = null;
  */
 function setSettingsWindow(window) {
   currentSettingsWindow = window;
-  console.log('🧦 Settings window registered for Discord RPC');
-
 }
 
 // ✅ Garder le dernier statut envoyé pour éviter les broadcasts inutiles
@@ -24,7 +22,6 @@ function broadcastDiscordStatus(discordRPC, force = false) {
   const rpc = discordRPC || currentDiscordRPC;
   
   if (!rpc) {
-    console.log('⚠️ No Discord RPC instance to broadcast');
     return;
   }
 
@@ -44,13 +41,6 @@ function broadcastDiscordStatus(discordRPC, force = false) {
       // Statut identique, pas de broadcast
       return;
     }
-    
-    console.log('📡 Broadcasting Discord status:', {
-      connected: status.connected,
-      connecting: status.connecting,
-      enabled: status.enabled,
-      user: status.user?.username
-    });
 
     currentSettingsWindow.webContents.send('discord-status-changed', {
       connected: status.connected,
@@ -87,12 +77,10 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
     discordRPC.removeAllListeners('connectionError');
 
     discordRPC.on('connected', (user) => {
-      console.log('✅ Discord connected event - User:', user?.username);
       broadcastDiscordStatus(discordRPC, true);
     });
 
     discordRPC.on('disconnected', () => {
-      console.log('❌ Discord disconnected event');
       broadcastDiscordStatus(discordRPC, true);
     });
 
@@ -109,7 +97,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
   
   // Handler: Settings window ready
   ipcMain.handle('settings-window-ready', async (event) => {
-    console.log('📨 Settings window ready signal received');
     return { success: true };
   });
   
@@ -119,7 +106,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
       const rpc = currentDiscordRPC || discordRPC;
       
       if (!rpc) {
-        console.log('⚠️ No Discord RPC instance available');
         return {
           connected: false,
           connecting: false,
@@ -130,7 +116,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
       }
 
       const status = rpc.getStatus();
-      console.log('📊 Discord status requested:', status);
       return status;
     } catch (error) {
       console.error('❌ Error getting Discord status:', error);
@@ -158,11 +143,8 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
         };
       }
 
-      console.log('🧪 Testing Discord RPC...');
-      const result = await rpc.test();
-      console.log('🧪 Test result:', result);
-      
-      // Broadcast le nouveau statut
+      const result = await rpc.test();      
+
       broadcastDiscordStatus(rpc);
       
       return result;
@@ -188,8 +170,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
         };
       }
 
-      console.log('🔄 Manual reconnection requested...');
-      
       // Broadcast "connecting"
       if (currentSettingsWindow && !currentSettingsWindow.isDestroyed()) {
         currentSettingsWindow.webContents.send('discord-status-changed', {
@@ -252,7 +232,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
         isConnecting: status.connecting
       };
 
-      console.log('📋 Discord settings retrieved:', settings);
       return settings;
     } catch (error) {
       console.error('❌ Error getting Discord settings:', error);
@@ -270,8 +249,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
   // Handler: Save Discord settings
   ipcMain.handle('save-discord-settings', async (event, settings) => {
     try {
-      console.log('💾 Saving Discord settings:', settings);
-
       // Sauvegarder dans le store
       store.set('discord.rpcEnabled', settings.rpcEnabled);
       store.set('discord.showStatus', settings.showStatus);
@@ -281,7 +258,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
       const rpc = currentDiscordRPC || discordRPC;
       
       if (!rpc) {
-        console.log('⚠️ No Discord RPC to update');
         return { success: true };
       }
 
@@ -294,10 +270,8 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
 
       // Gérer l'activation/désactivation
       if (!settings.rpcEnabled && rpc.isConnected) {
-        console.log('🔌 Disabling Discord RPC...');
         await rpc.disconnect();
       } else if (settings.rpcEnabled && !rpc.isConnected && !rpc.isConnecting) {
-        console.log('🔗 Enabling Discord RPC...');
         await rpc.initializeWithRetry(2, 500);
       }
 
@@ -319,8 +293,6 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
   // Handler: Reset Discord settings
   ipcMain.handle('reset-discord-settings', async (event) => {
     try {
-      console.log('🔄 Resetting Discord settings to defaults...');
-
       // Réinitialiser les paramètres
       store.set('discord.rpcEnabled', true);
       store.set('discord.showStatus', true);
@@ -357,17 +329,13 @@ function setupDiscordHandlers(discordRPC, store, settingsWindow) {
       };
     }
   });
-
-  console.log('✅ Discord IPC handlers configured');
 }
 
 /**
  * Mettre à jour la référence Discord RPC après initialisation
  */
 function updateDiscordReference(discordRPC) {
-  currentDiscordRPC = discordRPC;
-  console.log('✅ Discord RPC reference updated in handlers');
-  
+  currentDiscordRPC = discordRPC;  
   // ✅ Reset le cache pour forcer un broadcast lors du prochain événement
   lastBroadcastedStatus = null;
   
@@ -380,14 +348,10 @@ function updateDiscordReference(discordRPC) {
     discordRPC.removeAllListeners('connectionError');
 
     discordRPC.on('connected', (user) => {
-      console.log('✅ Discord connected event - User:', user?.username);
-      // Force le broadcast car c'est un vrai changement
       broadcastDiscordStatus(discordRPC, true);
     });
 
     discordRPC.on('disconnected', () => {
-      console.log('❌ Discord disconnected event');
-      // Force le broadcast car c'est un vrai changement
       broadcastDiscordStatus(discordRPC, true);
     });
 

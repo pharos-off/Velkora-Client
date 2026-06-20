@@ -7,7 +7,7 @@ class DiscordPresence extends EventEmitter {
     super();
 
     // Configuration
-    this.clientId = options.clientId || '1476358132623212699';
+    this.clientId = options.clientId || '1511773943839588455';
     this.autoReconnect = options.autoReconnect !== false;
     this.reconnectDelay = options.reconnectDelay || 2000;
     this.maxReconnectAttempts = options.maxReconnectAttempts || 10;
@@ -57,26 +57,19 @@ class DiscordPresence extends EventEmitter {
   /**
    * Initialiser la connexion Discord RPC avec retries
    */
-  async initializeWithRetry(maxRetries = 3, delayBetweenRetries = 1000) {
-    console.log(`🔄 Attempting to connect to Discord (max ${maxRetries} retries)...`);
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      console.log(`📍 Attempt ${attempt}/${maxRetries}...`);
-      
+  async initializeWithRetry(maxRetries = 3, delayBetweenRetries = 1000) {    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {      
       const success = await this.initialize();
       
       if (success) {
-        console.log('✅ Connection successful!');
         return true;
       }
       
       if (attempt < maxRetries) {
-        console.log(`⏳ Waiting ${delayBetweenRetries}ms before next attempt...`);
         await new Promise(resolve => setTimeout(resolve, delayBetweenRetries));
       }
     }
     
-    console.log('❌ Failed to connect after all retries');
     return false;
   }
 
@@ -107,17 +100,14 @@ class DiscordPresence extends EventEmitter {
    */
   async initialize() {
     if (!this.enabled) {
-      console.log('⚠️ Discord RPC disabled');
       return false;
     }
 
     if (this.isConnecting) {
-      console.log('⚠️ Connection already in progress...');
       return false;
     }
 
     if (this.isConnected) {
-      console.log('✅ Already connected to Discord');
       return true;
     }
 
@@ -129,14 +119,10 @@ class DiscordPresence extends EventEmitter {
 
     try {
       this.isConnecting = true;
-      console.log('🔗 Connecting to Discord RPC with Client ID:', this.clientId);
-
       // Créer un nouveau client
       this.client = new DiscordRPC.Client({
         transport: process.platform === 'win32' ? 'ipc' : 'ipc'
       });
-
-      console.log('✓ Discord RPC client created');
 
       // Promise pour attendre le ready event
       const readyPromise = new Promise((resolve, reject) => {
@@ -148,7 +134,6 @@ class DiscordPresence extends EventEmitter {
 
         // Handler temporaire pour le ready
         const onReady = () => {
-          console.log(`✅ Discord RPC READY - User: ${this.client.user?.username || 'Unknown'}`);
           clearTimeout(readyTimeout);
           resolve();
         };
@@ -159,14 +144,11 @@ class DiscordPresence extends EventEmitter {
       // Configurer les event handlers AVANT la connexion
       this.setupEventHandlers();
 
-      console.log('✓ Event handlers configured');
-
       // Attacher le garde d'erreur socket maintenant et après connexion
       this._attachSocketErrorGuard();
       this.once('connected', () => this._attachSocketErrorGuard());
 
       // Tenter la connexion avec timeout
-      console.log('⏳ Attempting login...');
       
       const loginPromise = this.client.login({ clientId: this.clientId });
       
@@ -180,8 +162,7 @@ class DiscordPresence extends EventEmitter {
       ]);
 
       clearTimeout(loginTimeout);
-      console.log('✓ Login completed, waiting for ready...');
-      
+
       // Attendre le ready event
       await readyPromise;
 
@@ -189,8 +170,6 @@ class DiscordPresence extends EventEmitter {
       this.isConnected = true;
       this.isConnecting = false;
       this.reconnectAttempts = 0;
-
-      console.log('✅ Successfully connected to Discord RPC');
 
       // Émettre l'événement de connexion
       this.emit('connected', this.client.user);
@@ -206,10 +185,6 @@ class DiscordPresence extends EventEmitter {
             if (!queuedActivity || typeof queuedActivity !== 'object') return;
 
             await this.client.setActivity(queuedActivity);
-            console.log(
-              '✅ Discord activity updated:',
-              queuedActivity.details || queuedActivity.state || 'Activity set'
-            );
             this.emit('activityUpdated', queuedActivity);
           } catch (e) {
             console.error('❌ Error updating activity:', e.message);
@@ -254,14 +229,8 @@ class DiscordPresence extends EventEmitter {
   setupEventHandlers() {
     if (!this.client) return;
 
-    console.log('📡 Configuring Discord event handlers');
-
-    // Note: Le ready est géré dans initialize() avec once()
-
     // Déconnexion
-    this.client.on('disconnected', () => {
-      console.log('⚠️ Discord RPC DISCONNECTED');
-      
+    this.client.on('disconnected', () => {      
       const wasConnected = this.isConnected;
       
       this.isConnected = false;
@@ -304,8 +273,6 @@ class DiscordPresence extends EventEmitter {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.min(this.reconnectAttempts, 5);
 
-    console.log(`🔄 Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms...`);
-
     this.reconnectTimeout = setTimeout(async () => {
       this.reconnectTimeout = null;
       await this.initialize();
@@ -317,7 +284,6 @@ class DiscordPresence extends EventEmitter {
    */
   async applyActivity(activity) {
     if (!this.isConnected || !this.client) {
-      console.log('⚠️ Not connected, activity queued');
       this.currentActivity = activity;
       return false;
     }
@@ -339,10 +305,6 @@ class DiscordPresence extends EventEmitter {
           if (!queuedActivity || typeof queuedActivity !== 'object') return;
 
           await this.client.setActivity(queuedActivity);
-          console.log(
-            '✅ Discord activity updated:',
-            queuedActivity.details || queuedActivity.state || 'Activity set'
-          );
           this.emit('activityUpdated', queuedActivity);
         } catch (error) {
           console.error('❌ Error updating activity:', error.message);
@@ -374,9 +336,7 @@ class DiscordPresence extends EventEmitter {
       showDetails: settings.showDetails !== false,
       showImage: settings.showImage !== false
     };
-    
-    console.log('🔧 RPC settings updated:', this.rpcSettings);
-    
+        
     // Reapply the activity with the new settings
     if (this.currentActivity && this.isConnected) {
       this.applyActivity(this.currentActivity);
@@ -547,7 +507,6 @@ class DiscordPresence extends EventEmitter {
       }
       await this.client.clearActivity();
       this.currentActivity = null;
-      console.log('🧹 Discord activity cleared');
       this.emit('activityCleared');
       return true;
     } catch (error) {
@@ -564,9 +523,7 @@ class DiscordPresence extends EventEmitter {
    * Disconnect cleanly
    */
   async disconnect() {
-    console.log('🔌 Disconnecting from Discord RPC...');
     if (this.isDisconnecting) {
-      console.log('⚠️ Already disconnecting, skipping duplicate call');
       return true;
     }
 
@@ -620,7 +577,6 @@ class DiscordPresence extends EventEmitter {
     // Restaurer l'autoReconnect
     this.autoReconnect = autoReconnectBackup;
 
-    console.log('✅ Discord RPC disconnected');
     this.emit('destroyed');
     
     return true;
@@ -682,8 +638,6 @@ class DiscordPresence extends EventEmitter {
     }
 
     try {
-      await this.setLauncher('Test User');
-      
       return { 
         success: true, 
         message: '✅ Discord RPC fonctionne parfaitement !',

@@ -111,7 +111,6 @@ class CacheManager {
 
     if (oldestKey) {
       this.delete(oldestKey);
-      console.log(`♻️ Cache éviction: ${oldestKey}`);
     }
   }
 

@@ -258,6 +258,7 @@
       font-size: 28px;
       margin-bottom: 25px;
       background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+      background-clip: text;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -322,7 +323,7 @@
     }
 
     .slider {
-      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
       height: 8px;
       background: rgba(99, 102, 241, 0.2);
@@ -758,7 +759,65 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="loading-screen" style="position:fixed;inset:0;background:rgba(10,15,25,0.95);display:none;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);">
+    <div style="text-align:center;">
+      <div style="width:50px;height:50px;border:3px solid rgba(99,102,241,0.2);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>
+      <div style="color:#cbd5e1;font-size:14px;">Chargement...</div>
+    </div>
+    <style>
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </div>
   <canvas id="settings-bg-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:-1;opacity:0.4;"></canvas>
+  <script>
+    // ✅ SIMPLE PAGE LOADER POUR SETTINGS
+    class SettingsPageLoader {
+      constructor() {
+        this.isLoading = false;
+        this.minDuration = 500;
+        this.loadStartTime = 0;
+      }
+
+      getLoadingScreen() {
+        return document.getElementById('loading-screen');
+      }
+
+      show() {
+        const screen = this.getLoadingScreen();
+        if (!screen) return;
+        this.isLoading = true;
+        this.loadStartTime = Date.now();
+        screen.style.display = 'flex';
+      }
+
+      hide() {
+        const screen = this.getLoadingScreen();
+        if (!screen || !this.isLoading) return;
+        
+        const elapsed = Date.now() - this.loadStartTime;
+        const remaining = Math.max(0, this.minDuration - elapsed);
+        
+        setTimeout(() => {
+          screen.style.display = 'none';
+          this.isLoading = false;
+        }, remaining);
+      }
+
+      async loadPage(renderFunction, setupFunction = null) {
+        this.show();
+        try {
+          if (renderFunction) await renderFunction();
+          if (setupFunction) setupFunction();
+        } catch (error) {
+          console.error('Page load error:', error);
+        } finally {
+          this.hide();
+        }
+      }
+    }
+
+    window.pageLoader = new SettingsPageLoader();
+  </script>
   <script src="settings-app.js"></script>
   <script>
     (function(){
