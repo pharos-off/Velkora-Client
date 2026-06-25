@@ -369,6 +369,27 @@ class MinecraftLauncher {
           try { reject(e); } catch (_) {}
         }
 
+        // Restore spawn only after the launcher has either closed or errored
+        const restoreSpawn = () => {
+          try {
+            if (_patchedSpawn) {
+              child_process.spawn = origSpawn;
+              _patchedSpawn = false;
+              console.log('[JavaLaunch] Spawn patch restored');
+            }
+          } catch (e) {
+            console.warn('[JavaLaunch] Failed to restore spawn:', e && e.message ? e.message : e);
+          }
+        };
+
+        this.launcher.on('close', (code) => {
+          restoreSpawn();
+        });
+
+        this.launcher.on('error', () => {
+          restoreSpawn();
+        });
+
         // Timeout de sécurité (90 minutes)
         closeTimeout = setTimeout(() => {
           console.warn('⚠️ Timeout: Download taking too long, checking files...');
@@ -380,6 +401,8 @@ class MinecraftLauncher {
           } else {
             reject(new Error('Timeout - fichiers manquants'));
           }
+
+          restoreSpawn();
         }, 90 * 60 * 1000);
 
       } catch (error) {
@@ -655,7 +678,7 @@ class MinecraftLauncher {
 
     if (onLog) onLog('info', `Java requis: ${requiredMajor}+, Java détecté: ${javaMajor ?? 'inconnu'}`);
     if (javaMajor && javaMajor < requiredMajor) {
-      const errorMsg = `❌ Minecraft ${version} nécessite Java ${requiredMajor}+\n\nVersion Java actuelle: ${javaMajor}\n\n⚠️ Pour Minecraft 26.1.2, téléchargez Java 25 depuis:\nhttps://adoptium.net/temurin/releases/?version=25\n\nOu configurez manuellement le chemin Java dans les paramètres du launcher.`;
+      const errorMsg = `❌ Minecraft ${version} nécessite Java ${requiredMajor}+\n\nVersion Java actuelle: ${javaMajor}\n\n⚠️ Pour Minecraft 26.2, téléchargez Java 25 depuis:\nhttps://adoptium.net/temurin/releases/?version=25\n\nOu configurez manuellement le chemin Java dans les paramètres du launcher.`;
       console.error(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -816,24 +839,35 @@ class MinecraftLauncher {
       console.log('');
 
       try {
-        // Temporarily patch child_process.spawn to force javaw and hide console on Windows
+        // ✅ Force javaw.exe to avoid console window on first launch
         const child_process = require('child_process');
         const origSpawn = child_process.spawn;
         let _patchedSpawn = false;
+        
         try {
           if (process.platform === 'win32' && typeof origSpawn === 'function') {
             child_process.spawn = function(command, args, options) {
               try {
                 let cmd = command;
+                
+                // ✅ Replace ANY form of java with javaw.exe
                 if (typeof cmd === 'string') {
                   const base = path.basename(cmd);
+                  // Match: java, java.exe, JAVA, JAVA.EXE, etc.
                   if (/^java(\.exe)?$/i.test(base)) {
-                    cmd = cmd.replace(/java(\.exe)?$/i, 'javaw.exe');
+                    // Replace with absolute path to javaw.exe
+                    const dir = path.dirname(cmd);
+                    cmd = path.join(dir, 'javaw.exe');
                   }
                 }
+                
+                // ✅ Hide console window on Windows
                 options = Object.assign({}, options || {}, { windowsHide: true });
+                
+                console.log(`[JavaLaunch] Command: ${cmd}, Hide: true`);
                 return origSpawn.call(child_process, cmd, args, options);
               } catch (e) {
+                console.warn(`[JavaLaunch Error] ${e.message}, falling back to original spawn`);
                 return origSpawn.call(child_process, command, args, options);
               }
             };
@@ -845,9 +879,12 @@ class MinecraftLauncher {
 
         this.launcher.launch(launchOptions);
 
-        // restore spawn after launching to avoid side-effects
+        // ✅ Restore spawn after launching to avoid side-effects
         try {
-          if (_patchedSpawn) child_process.spawn = origSpawn;
+          if (_patchedSpawn) {
+            child_process.spawn = origSpawn;
+            console.log('[JavaLaunch] Spawn patch removed');
+          }
         } catch (e) {
           // ignore
         }
@@ -984,6 +1021,8 @@ class MinecraftLauncher {
 
     // Fallback: retourner une liste de versions en cache
     return [
+      
+      { id: '26.2', name: '26.2', type: 'release', releaseTime: '2026-06-16T08:00:00Z' },
       { id: '26.1.2', name: '26.1.2', type: 'release', releaseTime: '2026-04-08T08:00:00Z' },
       { id: '26.1.1', name: '26.1.1', type: 'release', releaseTime: '2026-04-01T08:00:00Z' },
       { id: '1.21.11', name: '1.21.11', type: 'release', releaseTime: '2025-01-15T08:00:00Z' },

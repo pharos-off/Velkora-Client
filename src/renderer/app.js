@@ -100,6 +100,8 @@ class CraftLauncherApp {
     this.listeners = new Map();
     this.playerHead = null;
     this.isLaunching = false; // ✅ Flag pour éviter les doubles lancements
+    this.networkOnline = true;
+    this.networkStatus = 'unknown';
     this.selectedLaunchLoader = 'vanilla';
     this.viewChangeListener = null; // ✅ Référence du listener pour cleanup
     this.globalMusicPlayer = null; // ✅ Instance globale du lecteur de musique
@@ -418,6 +420,14 @@ class CraftLauncherApp {
       this.features = new LauncherFeatures(this);
       await this.loadData();
       
+      ipcRenderer.on('network-status', (event, { online }) => {
+        this.networkOnline = online === true;
+        this.networkStatus = online === true ? 'online' : 'offline';
+        this.render();
+      });
+
+      await this.checkNetworkStatus();
+      
       this.render();
       //this.setupRadioWidget();
       this.setupEventListeners();
@@ -462,6 +472,28 @@ class CraftLauncherApp {
     this.hideLoadingScreen();
     
     setInterval(() => this.updateFriendsStatus(), 30000);
+  }
+
+  async checkNetworkStatus() {
+    const browserOnline = typeof navigator !== 'undefined' && navigator.onLine;
+
+    try {
+      const status = await ipcRenderer.invoke('check-online');
+      const backendOnline = !!status?.online;
+      this.networkOnline = backendOnline || browserOnline;
+      this.networkStatus = this.networkOnline ? 'online' : 'offline';
+
+      if (!backendOnline && browserOnline) {
+        setTimeout(() => this.checkNetworkStatus(), 3500);
+      }
+    } catch (e) {
+      this.networkOnline = browserOnline;
+      this.networkStatus = this.networkOnline ? 'online' : 'offline';
+
+      if (browserOnline) {
+        setTimeout(() => this.checkNetworkStatus(), 3500);
+      }
+    }
   }
 
   async loadData() {
@@ -1669,13 +1701,25 @@ renderMainLayout() {
     const headUrl = this.playerHead?.success ? this.playerHead.url : firstSrc;
     
     const greetingMessage = this.getGreetingMessage();
-    const selectedVersion = this.selectedProfile?.version || '26.1.2';
+    const selectedVersion = this.selectedProfile?.version || '26.2';
     const availableLoaders = this.getAvailableLoadersForVersion(selectedVersion);
     const activeLaunchLoader = this.getActiveLaunchLoader(selectedVersion);
     const loaderHint = activeLaunchLoader === 'vanilla'
       ? 'Minecraft se lancera sans loader.'
       : `Minecraft se lancera avec ${this.formatLoaderLabel(activeLaunchLoader)}.`;
     
+    const networkBanner = this.networkOnline === false ? `
+      <div class="network-status-banner offline">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:rgba(220,38,38,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:14px;color:#f8fafc;margin-bottom:16px;">
+          <span style="font-size:18px;">${icons.globe}</span>
+          <div>
+            <strong>Hors-ligne</strong> — Aucune connexion Internet détectée.
+            Certaines fonctionnalités peuvent être limitées jusqu'à la reconnexion.
+          </div>
+        </div>
+      </div>
+    ` : '';
+
     // Icône Microsoft SVG
     const microsoftIcon = `<svg width="20" height="20" viewBox="0 0 23 23" fill="none">
       <path d="M0 0h11v11H0V0z" fill="#f25022"/>
@@ -1713,6 +1757,7 @@ renderMainLayout() {
             </div>
           </div>
         </div>
+        ${networkBanner}
 
 
         <!-- Carte de Lancement Principale -->
@@ -1724,6 +1769,7 @@ renderMainLayout() {
             </div>
             
             <select id="version-select" class="version-selector">
+              <option value="26.2" ${this.selectedProfile?.version === '26.2' ? 'selected' : ''}>26.2</option>
               <option value="26.1.2" ${this.selectedProfile?.version === '26.1.2' ? 'selected' : ''}>26.1.2</option>
               <option value="26.1.1" ${this.selectedProfile?.version === '26.1.1' ? 'selected' : ''}>26.1.1</option>
               <option value="1.21.11" ${this.selectedProfile?.version === '1.21.11' ? 'selected' : ''}>1.21.11</option>
@@ -4383,31 +4429,31 @@ renderMainLayout() {
 
     // ✅ BOUTONS D'ACTION - DISCORD
     document.getElementById('help-discord-join-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://discord.gg/rCFBHZencT');
+      window.electron.shell.openExternal('https://discord.gg/Xu9CqVqbJz');
     });
 
     // ✅ BOUTONS D'ACTION - GITHUB ISSUES
     document.getElementById('help-bug-report-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://github.com/velkora/launcher/issues/new');
+      window.electron.shell.openExternal('https://github.com/pharos-off/Velkora-Client/issues/new');
     });
 
     // ✅ BOUTONS D'ACTION - GITHUB PROJECT
     document.getElementById('help-github-project-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://github.com/velkora/launcher');
+      window.electron.shell.openExternal('https://github.com/pharos-off/Velkora-Client');
     });
 
     // ✅ BOUTONS À PROPOS
     document.getElementById('about-github-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://github.com/velkora/launcher');
+      window.electron.shell.openExternal('https://github.com/pharos-off/Velkora-Client');
     });
 
     document.getElementById('about-discord-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://discord.gg/rCFBHZencT');
+      window.electron.shell.openExternal('https://discord.gg/Xu9CqVqbJz');
     });
 
     // ✅ BOUTONS LICENCE
     document.getElementById('license-github-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('https://github.com/velkora/launcher');
+      window.electron.shell.openExternal('https://github.com/pharos-off/Velkora-Client');
     });
 
   }

@@ -10,7 +10,7 @@ const INVOKE_ALLOWED = [
   'save-discord-settings','open-minecraft-folder','reset-discord-settings','get-required-java-version','get-detected-java-path',
   'update-profile-version','save-settings','logout-account','ping-server','get-account-info','launch-game','get-mods-folder','launch-minecraft',
   'import-mod','download-modrinth-mod','download-modrinth-resourcepack','get-shaders-folder','get-installed-shaders','download-modrinth-shader',
-  'delete-mod','delete-resourcepack','delete-shader','login-microsoft'
+  'delete-mod','delete-resourcepack','delete-shader','login-microsoft','check-online'
 ];
 
 const SEND_ALLOWED = [
@@ -23,7 +23,7 @@ const ON_ALLOWED = [
   'add-log','settings-updated','set-logs','play-notification-sound','game-closed','launch-progress','launch-error',
   'navigate-to-tab','logout-from-settings','return-to-login','theme-updated','discord-status-changed','discord-connected',
   'discord-disconnected','discord-connecting','discord-error','discord-activity-updated','update-progress',
-  'keyboard-shortcuts','keyboard-commands','keyboard-settings','keyboard-home','keyboard-launch','clear-logs'
+  'keyboard-shortcuts','keyboard-commands','keyboard-settings','keyboard-home','keyboard-launch','clear-logs','network-status'
 ];
 
 const listeners = new Map();

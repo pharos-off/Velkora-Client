@@ -12,10 +12,14 @@ const SecurityManager = require('./security-manager');
 const ElectronSecurity = require('./electron-security');
 const NetworkManager = require('./network-manager');
 const CacheManager = require('./cache-manager');
+const BackupManager = require('./backup-manager');
+const registerNewFeatureHandlers = require('./feature-handlers');
 let _msAuthInstance = null;
 
 const si = require('systeminformation');
 const fetch = require('node-fetch');
+const dns = require('dns');
+const net = require('net');
 const mc = require('minecraft-protocol');
 const fs = require('fs');
 const os = require('os');
@@ -31,9 +35,96 @@ const networkManager = new NetworkManager({
   cache: { maxSize: 100, defaultTTL: 5 * 60 * 1000 }
 });
 
+const INTERNET_CHECK_TIMEOUT = 5000;
+let startupNetworkStatus = 'unknown';
 
-const LAUNCHER_VERSION = '4.3.2';
-const LAUNCHER_BUILD = '20260620';
+function dnsLookup(hostname, timeoutMs = 3000) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve(false);
+    }, timeoutMs);
+
+    dns.lookup(hostname, (err) => {
+      clearTimeout(timer);
+      resolve(!err);
+    });
+  });
+}
+
+async function tryFetchUrl(url, timeoutMs = INTERNET_CHECK_TIMEOUT) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'User-Agent': `${LAUNCHER_NAME}/${LAUNCHER_VERSION}` }
+    });
+
+    clearTimeout(timeout);
+    return response && (response.ok || response.status === 204 || response.status === 200);
+  } catch (error) {
+    return false;
+  }
+}
+
+async function tcpProbe(host, port = 53, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let resolved = false;
+
+    const onDone = (ok) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(ok);
+    };
+
+    const timer = setTimeout(() => onDone(false), timeoutMs);
+
+    socket.once('connect', () => onDone(true));
+    socket.once('error', () => onDone(false));
+    socket.once('timeout', () => onDone(false));
+
+    socket.connect(port, host);
+  });
+}
+
+async function waitForInternet(timeoutMs = 15000, intervalMs = 2500) {
+  const start = Date.now();
+  const targets = [
+    'https://www.google.com/generate_204',
+    'https://example.com/',
+    'https://launchermeta.mojang.com/mc/game/version_manifest.json'
+  ];
+  const probeHosts = ['1.1.1.1', '8.8.8.8'];
+
+  while (Date.now() - start < timeoutMs) {
+    for (const host of probeHosts) {
+      if (await tcpProbe(host, 53, 2000)) {
+        return true;
+      }
+    }
+
+    if (await dnsLookup('google.com', 2000) || await dnsLookup('cloudflare.com', 2000)) {
+      for (const target of targets) {
+        if (await tryFetchUrl(target, INTERNET_CHECK_TIMEOUT)) {
+          return true;
+        }
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+
+  return false;
+}
+
+const LAUNCHER_VERSION = '4.3.4';
+const LAUNCHER_BUILD = '20260625';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {
@@ -236,6 +327,12 @@ let minecraftRunning = false;
 let lastLaunchAttempt = 0;
 let lastGameClosedAt = 0;
 let tokenRefreshInterval = null;
+
+// ✅ Managers pour nouvelles fonctionnalités
+let jvmOptimizer = null;
+let resourcePackManager = null;
+let gameMonitor = null;
+let backupManager = null;
 // Ignorer certaines erreurs bénignes lors de l’extinction (race Discord RPC)
 process.on('uncaughtException', (err) => {
   try {
@@ -328,6 +425,11 @@ ipcMain.handle('show-main-window', async () => {
   }
 });
 
+ipcMain.handle('check-online', async () => {
+  const online = await waitForInternet(10000, 2500);
+  return { online };
+});
+
 function createWindow() {
   const iconPath = path.resolve(getIconPath());
   
@@ -367,6 +469,16 @@ function createWindow() {
   }
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('network-status', { online: startupNetworkStatus === 'online' });
+      }
+    } catch (e) {
+      console.warn('Erreur envoi network-status:', e && e.message ? e.message : e);
+    }
+  });
 
   if (process.argv.some(arg => arg === '--dev' || arg === 'dev')) {
     mainWindow.webContents.openDevTools();
@@ -723,7 +835,7 @@ function createLogsWindow() {
     </head>
     <body>
       <div class="titlebar">
-        <div class="titlebar-title">Mission Control / ${LAUNCHER_NAME} with ${os.version}</div>
+        <div class="titlebar-title">Mission Control / ${LAUNCHER_NAME}</div>
         <div class="titlebar-buttons">
           <button class="titlebar-button minimize" id="minimize-btn" title="Réduire">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1222,6 +1334,14 @@ app.whenReady().then(async () => {
   
   initModsDirectory();
   
+  // ✅ INITIALISER LES NOUVEAUX HANDLERS DE FONCTIONNALITÉS
+  try {
+    registerNewFeatureHandlers(app, store);
+    console.log('✅ Feature handlers initialized (JVM, ResourcePacks, Monitor, Backup)');
+  } catch (err) {
+    console.warn('⚠️ Feature handlers initialization failed:', err.message);
+  }
+  
   // ✅ Valider et rafraîchir le token au démarrage si nécessaire
   try {
     const authData = store.get('authData');
@@ -1250,7 +1370,16 @@ app.whenReady().then(async () => {
     app.setLoginItemSettings({ openAtLogin: startup, path: process.execPath });
   } catch (_) {}
 
-  // ✅ Retarder la création de la fenêtre principale pour laisser le loading screen s'afficher
+  // ✅ Attendre la connexion réseau au démarrage avant d'ouvrir l'interface
+  try {
+    const hasInternet = await waitForInternet(15000, 2500);
+    startupNetworkStatus = hasInternet ? 'online' : 'offline';
+    console.log(`[APP STARTUP] Internet disponible: ${hasInternet}`);
+  } catch (error) {
+    console.warn('[APP STARTUP] Vérification réseau échouée:', error && error.message ? error.message : error);
+    startupNetworkStatus = 'offline';
+  }
+
   setTimeout(() => {
     createWindow();
   }, 500);
@@ -2129,7 +2258,7 @@ ipcMain.handle('get-profile', async (event, profileId) => {
     {
       id: 1,
       name: 'Principal',
-      version: '26.1.2',
+      version: '26.2',
       loader: 'vanilla',
       lastPlayed: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString()
@@ -2155,7 +2284,7 @@ ipcMain.handle('create-profile', async (event, profileData) => {
   const newProfile = {
     id: newId,
     name: profileData.name || `Profil ${newId}`,
-    version: profileData.version || '26.1.2',
+    version: profileData.version || '26.2',
     loader: profileData.loader || 'vanilla',
     lastPlayed: null,
     createdAt: new Date().toISOString()
@@ -2229,7 +2358,7 @@ ipcMain.handle('update-profile-version', async (event, version, profileId = 1) =
     {
       id: 1,
       name: 'Principal',
-      version: '26.1.2',
+      version: '26.2',
       loader: 'vanilla',
       ram: 4,
       lastPlayed: new Date().toISOString().split('T')[0]
@@ -2542,6 +2671,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
             }
             // Marquer le moment de la fermeture pour éviter un relancement immédiat
             try { lastGameClosedAt = Date.now(); setTimeout(() => { lastGameClosedAt = 0; }, 15000); } catch(_) {}
+            minecraftRunning = false;
             if (settings.closeLauncherOnLaunch && mainWindow && !mainWindow.isDestroyed()) {
               mainWindow.show();
               mainWindow.focus();
@@ -2637,25 +2767,6 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
         success: false,
         error: `Erreur de lancement: ${launchError.message}`
       };
-      
-    } finally {
-      // ✅ Réinitialiser après un délai
-      setTimeout(() => {
-        console.log('🧹 Nettoyage après lancement');
-        minecraftRunning = false;
-        
-        // Discord RPC: remettre en idle
-        if (discordRPC && discordRPC.isConnected) {
-          discordRPC.setIdle().catch(err => {
-            console.warn('⚠️ Erreur Discord setIdle:', err.message);
-          });
-        }
-        
-        // Garbage collection si disponible
-        if (global.gc) {
-          global.gc();
-        }
-      }, 5000);
     }
 
   } catch (error) {

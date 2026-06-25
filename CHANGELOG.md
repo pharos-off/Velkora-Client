@@ -1,20 +1,10 @@
 # Changelog
 
-### 🐛 Fixes
-- **Thème**: Corrigé le bug du chargement figé lors du changement de thème/accent
-  - Suppression de l'appel inutile à `render()` pour les changements de thème
-  - Mise à jour instantanée des styles CSS sans passer par PageLoader
-  - Les boutons de thème se mettent à jour visuellement en temps réel
-  - L'interface reste réactive et fluide pendant les changements
-  
-### ⚡ Performance
-- **PageLoader**: Optimisé pour éviter de masquer inutilement le contenu
-  - Les transitions sont maintenant lisses et prévisibles
-  - L'opacité du contenu est garantie à 100% lors du rendu
-  - Gestion améliorée des erreurs pour maintenir la visibilité
+## [Unreleased] - 2026-06-25
 
-### 🔄 Changes
-- **Thème Manager**: Les changements de thème et d'accent sont maintenant instantanés
-  - Pas de délai d'attente pour voir les changements
-  - L'affichage du "Thème actuel" se met à jour immédiatement
-  - Les boutons de sélection reflètent l'état actuel instantanément
+- Correction : démarrage automatique sous Windows attend désormais la connexion Internet avant d’afficher l’interface principale.
+- Correction : détection réseau renforcée au démarrage avec vérification DNS, connexion TCP et plusieurs requêtes HTTP vers des serveurs fiables.
+- Correction : ajout de la prise en charge IPC `check-online` et `network-status` dans `preload.js` pour éviter le blocage des vérifications réseau côté renderer.
+- Correction : comportement de secours dans le renderer utilisant `navigator.onLine` afin de ne pas afficher un faux message hors ligne lorsque le PC est connecté.
+- Amélioration : lancement Minecraft forcé avec `javaw` après le téléchargement pour éviter l’ouverture de la console Java.
+- Amélioration : prévention du double démarrage de Minecraft après fermeture de l’instance lancée depuis le launcher.

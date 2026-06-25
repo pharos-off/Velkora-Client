@@ -728,6 +728,7 @@ function renderSettings() {
             <div class="setting-item">
               <label>Version utilisée (profil principal)</label>
               <select id="settings-version-select" class="input-field">
+                <option value="26.2">26.2</option>
                 <option value="26.1.2">26.1.2</option>
                 <option value="26.1.1">26.1.1</option>
                 <option value="1.21.11">1.21.11</option>
@@ -813,13 +814,6 @@ function renderSettings() {
                 <span>Afficher la fenêtre des logs</span>
               </label>
               <p class="help-text">Ouvre une fenêtre dédiée aux logs de lancement</p>
-            </div>
-            <div class="setting-item" style="margin-top: 16px;">
-              <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="startup-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
-                <span>Lancer ${LauncherVersion.getName()} au démarrage de Windows</span>
-              </label>
-              <p class="help-text">Ajoute l'application dans les Applications de démarrage (Gestionnaire des tâches)</p>
             </div>
           </div>
 
