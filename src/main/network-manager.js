@@ -5,7 +5,7 @@
  * ================================
  */
 
-const fetch = require('node-fetch');
+const fetch = require('node-fetch').default || require('node-fetch');
 const CacheManager = require('./cache-manager');
 
 class NetworkManager {

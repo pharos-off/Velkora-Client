@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Échec de la connexion</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #120b12;
+      --panel: rgba(27, 17, 27, 0.95);
+      --border: rgba(239, 68, 68, 0.28);
+      --text: #f8fafc;
+      --muted: #fbcfe8;
+      --accent: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, #38101e 0%, var(--bg) 60%);
+      color: var(--text);
+    }
+    .card {
+      width: min(100%, 540px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      text-align: center;
+    }
+    .spinner {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 4px solid rgba(255,255,255,0.12);
+      border-top-color: var(--accent);
+      margin: 0 auto 18px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0; color: var(--muted); line-height: 1.6; }
+    .failure {
+      margin-top: 14px;
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.14);
+      color: #fecdd3;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(31, 12, 18, 0.72);
+      border: 1px solid rgba(239, 68, 68, 0.16);
+      color: #f3c0cb;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h1>Échec de la connexion Microsoft</h1>
+    <p>Une erreur est survenue pendant l’authentification. Vérifiez votre compte et réessayez.</p>
+    <div class="failure">Échec de connexion</div>
+    <div class="note">
+      Vos données restent protégées. Velkora n’est pas connecté et ne conserve aucune session valide et invalide.
+    </div>
+  </div>
+</body>
+</html>

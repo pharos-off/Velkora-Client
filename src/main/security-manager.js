@@ -6,7 +6,7 @@
  */
 
 const crypto = require('crypto');
-const Store = require('electron-store');
+const Store = require('electron-store').default || require('electron-store');
 const path = require('path');
 
 class SecurityManager {

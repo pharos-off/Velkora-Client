@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion réussie</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060816;
+      --panel: rgba(15, 23, 42, 0.95);
+      --border: rgba(34, 197, 94, 0.28);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, #052e16 0%, var(--bg) 60%);
+      color: var(--text);
+    }
+    .card {
+      width: min(100%, 540px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 24px 70px rgba(2, 8, 23, 0.45);
+      text-align: center;
+    }
+    .spinner {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 4px solid rgba(255,255,255,0.12);
+      border-top-color: var(--accent);
+      margin: 0 auto 18px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0; color: var(--muted); line-height: 1.6; }
+    .success {
+      margin-top: 14px;
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.14);
+      color: #bbf7d0;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(34, 197, 94, 0.16);
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h1>Connexion Microsoft réussie</h1>
+    <p>Votre compte est maintenant validé. La fermeture de cette fenêtre va permettre au launcher de se poursuivre.</p>
+    <div class="success">Connexion validée avec succès</div>
+    <div class="note">
+      Vos données sont protégées par Microsoft. Velkora ne conserve que les informations nécessaires pour vous connecter et lancer Minecraft.
+    </div>
+  </div>
+</body>
+</html>

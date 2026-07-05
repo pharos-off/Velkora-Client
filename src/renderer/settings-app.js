@@ -15,6 +15,7 @@ try {
 } catch (e) {
   ipcRenderer = null;
 }
+const path = require('path');
 const LauncherVersion = require('../main/launcher-version.js');
 const UIFeedback = require('./ui-feedback.js');
 const { icons: lucideIcons } = require('./lucide-icons.js');
@@ -22,28 +23,25 @@ const { icons: lucideIcons } = require('./lucide-icons.js');
 let originalSettings = {};
 let currentSettings = {};
 const ui = new UIFeedback({ namespace: 'settings-ui' });
-let notificationAudioContext = null;
+let notificationAudio = null;
+const notificationSoundPath = path.resolve(__dirname, '../../assets/sound-notification.wav');
+const notificationSoundUrl = `file://${notificationSoundPath.replace(/\\/g, '/')}`;
 
 function playNotificationSound(volume = 0.5) {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    if (!notificationAudioContext) {
-      notificationAudioContext = new AudioContext();
+    if (!notificationAudio) {
+      notificationAudio = new Audio();
+      notificationAudio.preload = 'auto';
     }
 
-    const oscillator = notificationAudioContext.createOscillator();
-    const gainNode = notificationAudioContext.createGain();
-    gainNode.gain.value = Math.max(0, Math.min(volume, 1)) * 0.25;
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 880;
-    oscillator.connect(gainNode);
-    gainNode.connect(notificationAudioContext.destination);
-    oscillator.start();
-    oscillator.stop(notificationAudioContext.currentTime + 0.12);
-    oscillator.onended = () => {
-      try { oscillator.disconnect(); gainNode.disconnect(); } catch (_) {}
-    };
+    notificationAudio.src = notificationSoundUrl;
+    notificationAudio.volume = Math.max(0, Math.min(volume, 1));
+    notificationAudio.currentTime = 0;
+
+    const playPromise = notificationAudio.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
   } catch (error) {
     console.warn('Unable to play notification sound:', error);
   }
@@ -99,6 +97,7 @@ async function loadSettings() {
     const gameDirInput = document.getElementById('game-dir-input');
     const discordToggle = document.getElementById('discord-rpc-toggle');
     const fullscreenToggle = document.getElementById('fullscreen-toggle');
+    const missionControlFullscreenToggle = document.getElementById('mission-control-fullscreen-toggle');
     const ramSlider = document.getElementById('ram-slider');
     const ramValue = document.getElementById('ram-value');
     const ramHelpText = document.getElementById('ram-help-text');
@@ -114,6 +113,7 @@ async function loadSettings() {
     }
     if (discordToggle) discordToggle.checked = settings.discordRPC || false;
     if (fullscreenToggle) fullscreenToggle.checked = settings.fullscreen || false;
+    if (missionControlFullscreenToggle) missionControlFullscreenToggle.checked = settings.missionControlFullscreen || false;
     const showLogsToggle = document.getElementById('show-logs-toggle');
     if (showLogsToggle) showLogsToggle.checked = settings.showLogsWindow !== undefined ? settings.showLogsWindow : true;
     const closeOnLaunchToggle = document.getElementById('close-launcher-toggle');
@@ -856,6 +856,13 @@ function renderSettings() {
                 <span>Lancer en plein écran</span>
               </label>
               <p class="help-text">Lance le launcher en mode plein écran au démarrage</p>
+            </div>
+            <div class="setting-item" style="margin-top: 16px;">
+              <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="mission-control-fullscreen-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
+                <span>Afficher Mission Control en grand écran</span>
+              </label>
+              <p class="help-text">Ouvre Mission Control en plein écran lorsqu'il est visible.</p>
             </div>
           </div>
 
@@ -1645,6 +1652,7 @@ function renderSettings() {
           gameDirectory: document.getElementById('game-dir-input').value,
           discordRPC: document.getElementById('discord-rpc-toggle').checked,
           fullscreen: document.getElementById('fullscreen-toggle').checked,
+          missionControlFullscreen: document.getElementById('mission-control-fullscreen-toggle').checked,
           ramAllocation: parseInt(document.getElementById('ram-slider').value, 10),
           defaultServer: (document.getElementById('default-server-input')?.value || '').trim(),
           startupOnBoot: !!document.getElementById('startup-toggle')?.checked,
@@ -1669,6 +1677,12 @@ function renderSettings() {
           ipcRenderer.send('toggle-fullscreen', true);
         } else {
           ipcRenderer.send('toggle-fullscreen', false);
+        }
+
+        if (settings.missionControlFullscreen) {
+          ipcRenderer.send('set-logs-fullscreen', true);
+        } else {
+          ipcRenderer.send('set-logs-fullscreen', false);
         }
         
         currentSettings = JSON.parse(JSON.stringify(settings));

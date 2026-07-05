@@ -1,6 +1,6 @@
 const { BrowserWindow, session } = require('electron');
-const fetch = require('node-fetch');
-const Store = require('electron-store');
+const fetch = require('node-fetch').default || require('node-fetch');
+const Store = require('electron-store').default || require('electron-store');
 const path = require('path');
 const crypto = require('crypto');
 
@@ -16,6 +16,120 @@ class MicrosoftAuth {
     this.authInProgress = false;
     this.authWindow = null;
     this.authPromise = null;
+  }
+
+  async showBriefLoadingWindow(delayMs = 8000) {
+    try {
+      if (this.authWindow && !this.authWindow.isDestroyed()) {
+        try {
+          await this.authWindow.loadFile(path.join(__dirname, 'microsoft-auth-loading.html'));
+        } catch (error) {
+          console.warn('⚠️ Impossible de recharger l’écran d’attente Microsoft:', error.message);
+        }
+        this.authWindow.show();
+        this.authWindow.focus();
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (!this.authWindow.isDestroyed()) {
+          this.authWindow.close();
+          this.authWindow = null;
+        }
+        return;
+      }
+
+      const window = new BrowserWindow({
+        width: 640,
+        height: 760,
+        show: true,
+        icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
+        title: 'Connexion Microsoft - Velkora',
+        center: true,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        fullscreenable: false,
+        autoHideMenuBar: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+          partition: 'persist:auth'
+        }
+      });
+
+      this.authWindow = window;
+
+      const loadingHtmlPath = path.join(__dirname, 'microsoft-auth-loading.html');
+      try {
+        await window.loadFile(loadingHtmlPath);
+      } catch (error) {
+        console.warn('⚠️ Impossible de charger l’écran d’attente Microsoft:', error.message);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      if (!window.isDestroyed()) {
+        window.close();
+      }
+      if (this.authWindow === window) {
+        this.authWindow = null;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de l’affichage de la fenêtre de chargement Microsoft:', error.message);
+    }
+  }
+
+  async showFailureWindow(delayMs = 6000, reuseExistingWindow = true) {
+    try {
+      let window = reuseExistingWindow ? this.authWindow : null;
+      if (window && !reuseExistingWindow && !window.isDestroyed()) {
+        try {
+          window.close();
+        } catch (_) {}
+        window = null;
+      }
+
+      if (!window || window.isDestroyed()) {
+        window = new BrowserWindow({
+          width: 640,
+          height: 760,
+          show: true,
+          icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
+          title: 'Échec de la connexion Microsoft - Velkora',
+          center: true,
+          resizable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false,
+          autoHideMenuBar: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            partition: 'persist:auth'
+          }
+        });
+        this.authWindow = window;
+      }
+
+      try {
+        await window.loadFile(path.join(__dirname, 'microsoft-auth-failure.html'));
+      } catch (error) {
+        console.warn('⚠️ Impossible de charger l’écran d’échec Microsoft:', error.message);
+      }
+
+      window.show();
+      window.focus();
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      if (!window.isDestroyed()) {
+        window.close();
+      }
+      if (this.authWindow === window) {
+        this.authWindow = null;
+      }
+    } catch (error) {
+      console.warn('⚠️ Erreur lors de l’affichage de la fenêtre d’échec Microsoft:', error.message);
+    }
   }
 
   /**
@@ -57,10 +171,17 @@ class MicrosoftAuth {
         }
 
         this.authWindow = new BrowserWindow({
-          width: 600,
-          height: 700,
+          width: 640,
+          height: 760,
           show: true,
           icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
+          title: 'Connexion Microsoft - Velkora',
+          center: true,
+          resizable: false,
+          minimizable: false,
+          maximizable: false,
+          fullscreenable: false,
+          autoHideMenuBar: true,
           webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -73,6 +194,13 @@ class MicrosoftAuth {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         );
 
+        const loadingHtmlPath = path.join(__dirname, 'microsoft-auth-loading.html');
+        try {
+          await this.authWindow.loadFile(loadingHtmlPath);
+        } catch (error) {
+          console.warn('⚠️ Impossible de charger l’écran d’attente Microsoft:', error.message);
+        }
+
         const authUrl =
           `https://login.live.com/oauth20_authorize.srf` +
           `?client_id=${this.clientId}` +
@@ -81,11 +209,20 @@ class MicrosoftAuth {
           `&scope=XboxLive.signin%20offline_access` +
           `&prompt=select_account`;
 
-        console.log('🔐 [authenticate()] Loading Microsoft auth URL:', authUrl);
-        this.authWindow.loadURL(authUrl);
-
         let isProcessing = false;
+        let didShowIntro = true;
         let windowClosed = false;
+        const introDelayMs = 15000;
+
+        const loadMicrosoftAuth = () => {
+          if (!this.authWindow || this.authWindow.isDestroyed()) return;
+          console.log('🔐 [authenticate()] Loading Microsoft auth URL after intro delay:', authUrl);
+          this.authWindow.loadURL(authUrl);
+        };
+
+        const introTimer = setTimeout(() => {
+          loadMicrosoftAuth();
+        }, introDelayMs);
 
         const timeout = setTimeout(() => {
           if (!isProcessing && this.authWindow && !this.authWindow.isDestroyed()) {
@@ -101,20 +238,10 @@ class MicrosoftAuth {
         const handleUrl = async (url) => {
           if (isProcessing || windowClosed) return;
 
-          // Ignore Microsoft error pages and redirects
-          if (url.includes('login.live.com/oauth20_desktop.srf') && !url.includes('code=')) {
-            return;
-          }
-
           if (url.includes('code=') || url.includes('error=')) {
             isProcessing = true;
             clearTimeout(timeout);
-
-            if (this.authWindow && !this.authWindow.isDestroyed()) {
-              windowClosed = true;
-              this.authWindow.close();
-              this.authWindow = null;
-            }
+            clearTimeout(introTimer);
 
             try {
               const urlParams = new URL(url);
@@ -124,6 +251,8 @@ class MicrosoftAuth {
 
               if (error) {
                 console.error('❌ Authentication error:', errorDescription || error);
+                clearTimeout(introTimer);
+                await this.showFailureWindow(6000);
                 this.authInProgress = false;
                 this.authPromise = null;
                 resolve({
@@ -135,7 +264,26 @@ class MicrosoftAuth {
 
               if (code) {
                 console.log('✅ Authorization code received');
+
                 const result = await this.completeAuthFlow(code);
+                if (result.success && this.authWindow && !this.authWindow.isDestroyed()) {
+                  try {
+                    await this.authWindow.loadFile(path.join(__dirname, 'microsoft-auth-success.html'));
+                    this.authWindow.show();
+                    this.authWindow.focus();
+                    await new Promise((resolve) => setTimeout(resolve, 6000));
+                  } catch (error) {
+                    console.warn('⚠️ Impossible d’afficher l’écran de succès Microsoft:', error.message);
+                  }
+                }
+
+                if (this.authWindow && !this.authWindow.isDestroyed()) {
+                  try {
+                    this.authWindow.close();
+                  } catch (_) {}
+                  this.authWindow = null;
+                }
+
                 this.authInProgress = false;
                 this.authPromise = null;
                 resolve(result);
@@ -144,6 +292,12 @@ class MicrosoftAuth {
               this.authInProgress = false;
               this.authPromise = null;
               console.error('❌ Error in handleUrl:', error.message);
+              if (this.authWindow && !this.authWindow.isDestroyed()) {
+                try {
+                  this.authWindow.close();
+                } catch (_) {}
+                this.authWindow = null;
+              }
               resolve({ success: false, error: error.message });
             }
           }
@@ -151,20 +305,31 @@ class MicrosoftAuth {
 
         // Utiliser seulement will-redirect pour éviter les doubles déclenchements
         this.authWindow.webContents.on('will-redirect', (event, url) => handleUrl(url));
+        this.authWindow.webContents.on('will-navigate', (event, url) => handleUrl(url));
+        this.authWindow.webContents.on('did-navigate', (event, url) => handleUrl(url));
 
-        this.authWindow.on('closed', () => {
+        this.authWindow.on('closed', async () => {
           clearTimeout(timeout);
+          clearTimeout(introTimer);
+          const wasProcessing = isProcessing;
           this.authWindow = null;
-          if (!isProcessing) {
+          if (!wasProcessing) {
+            try {
+              await this.showFailureWindow(6000, false);
+            } catch (_) {}
             this.authInProgress = false;
             this.authPromise = null;
             resolve({ success: false, error: 'Authentication window closed' });
           }
         });
 
-        this.authWindow.webContents.on('crashed', () => {
+        this.authWindow.webContents.on('crashed', async () => {
           clearTimeout(timeout);
+          clearTimeout(introTimer);
           this.authWindow = null;
+          try {
+            await this.showFailureWindow(6000);
+          } catch (_) {}
           this.authInProgress = false;
           this.authPromise = null;
           resolve({ success: false, error: 'Window crashed' });

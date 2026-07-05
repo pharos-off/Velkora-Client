@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, session, nativeImage } = require('electron');
 const path = require('path');
-const Store = require('electron-store');
+const Store = require('electron-store').default || require('electron-store');
 const { spawn } = require("child_process");
 const MinecraftLauncher = require('./minecraft-launcher');
 const MicrosoftAuth = require('./microsoft-auth');
@@ -17,7 +17,7 @@ const registerNewFeatureHandlers = require('./feature-handlers');
 let _msAuthInstance = null;
 
 const si = require('systeminformation');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch').default || require('node-fetch');
 const dns = require('dns');
 const net = require('net');
 const mc = require('minecraft-protocol');
@@ -123,8 +123,8 @@ async function waitForInternet(timeoutMs = 15000, intervalMs = 2500) {
   return false;
 }
 
-const LAUNCHER_VERSION = '4.3.4';
-const LAUNCHER_BUILD = '20260625';
+const LAUNCHER_VERSION = '4.4.0';
+const LAUNCHER_BUILD = '20260705';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {
@@ -570,11 +570,17 @@ function createLogsWindow() {
 
   const iconPath = path.resolve(getIconPath());
 
+  const appSettings = store.get('settings', {});
+  const logsFullscreen = !!appSettings.missionControlFullscreen;
+
   const windowOptions = {
     width: 950,
     height: 600,
     minWidth: 700,
     minHeight: 400,
+    resizable: true,
+    maximizable: true,
+    minimizable: true,
     frame: false,
     backgroundColor: '#0a0e27',
     skipTaskbar: false,
@@ -597,6 +603,21 @@ function createLogsWindow() {
   }
 
   logsWindow = new BrowserWindow(windowOptions);
+  if (logsFullscreen) {
+    logsWindow.maximize();
+  }
+
+  logsWindow.on('maximize', () => {
+    if (logsWindow && !logsWindow.isDestroyed()) {
+      logsWindow.webContents.send('window-maximized');
+    }
+  });
+
+  logsWindow.on('unmaximize', () => {
+    if (logsWindow && !logsWindow.isDestroyed()) {
+      logsWindow.webContents.send('window-unmaximized');
+    }
+  });
 
   // Ouvrir DevTools en mode dev
   if (process.argv.some(arg => arg === '--dev' || arg === 'dev')) {
@@ -613,223 +634,417 @@ function createLogsWindow() {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Logs Minecraft</title>
+      <title>Mission Control</title>
       <style>
         * {
           margin: 0;
           padding: 0;
           box-sizing: border-box;
         }
-        
-        body {
-          background: #0a0e27;
+
+        :root {
+          color-scheme: dark;
+          font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           color: #e2e8f0;
-          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-          font-size: 12px;
-          height: 100vh;
+          background: #0b1121;
+        }
+
+        html, body {
+          height: 100%;
+        }
+
+        body {
+          min-height: 100vh;
           display: flex;
           flex-direction: column;
-        }
-
-        .logs-header {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-          border-bottom: 1px solid rgba(99, 102, 241, 0.3);
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          justify-content: space-between;
-        }
-
-        .logs-header-left {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .logs-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #e2e8f0;
-        }
-
-        .logs-search {
-          flex: 1;
-          max-width: 300px;
-        }
-
-        .logs-search input {
-          width: 100%;
-          padding: 8px 12px;
-          background: rgba(30, 41, 59, 0.6);
-          border: 1px solid rgba(99, 102, 241, 0.2);
-          border-radius: 6px;
-          color: #e2e8f0;
-          font-size: 12px;
-          font-family: inherit;
-        }
-
-        .logs-search input::placeholder {
-          color: #64748b;
-        }
-
-        .logs-search input:focus {
-          outline: none;
-          border-color: rgba(99, 102, 241, 0.5);
-          background: rgba(30, 41, 59, 0.8);
-        }
-
-        .logs-buttons {
-          display: flex;
-          gap: 8px;
-        }
-
-        .logs-btn {
-          padding: 6px 12px;
-          background: rgba(99, 102, 241, 0.2);
-          border: 1px solid rgba(99, 102, 241, 0.3);
-          border-radius: 6px;
-          color: #cbd5e1;
-          cursor: pointer;
-          font-size: 11px;
-          transition: all 0.2s;
-          text-align: center;
-          white-space: nowrap;
-        }
-
-        .logs-btn:hover {
-          background: rgba(99, 102, 241, 0.3);
-          border-color: rgba(99, 102, 241, 0.5);
-          color: #e2e8f0;
-        }
-
-        .logs-container {
-          flex: 1;
-          overflow-y: auto;
-          background: #0a0e27;
-          padding: 12px 16px;
-        }
-
-        .log-line {
-          padding: 2px 0;
-          line-height: 1.4;
-          white-space: pre-wrap;
-          word-break: break-all;
-          font-size: 11px;
-        }
-
-        .log-line.info {
-          color: #cbd5e1;
-        }
-
-        .log-line.success {
-          color: #10b981;
-        }
-
-        .log-line.warning {
-          color: #f59e0b;
-        }
-
-        .log-line.error {
-          color: #ef4444;
-        }
-
-        .log-line.debug {
-          color: #8b5cf6;
-        }
-
-        .logs-empty {
-          text-align: center;
-          color: #64748b;
-          padding-top: 40px;
-        }
-
-        ::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-          background: rgba(99, 102, 241, 0.3);
-          border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(99, 102, 241, 0.5);
+          background: linear-gradient(135deg, #0f1729 0%, #1a2332 100%);
+          overflow: hidden;
         }
 
         .titlebar {
-          height: 40px;
-          background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(20, 30, 50, 0.9) 100%);
+          height: 44px;
+          background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(20, 30, 50, 0.92) 100%);
           border-bottom: 1px solid rgba(99, 102, 241, 0.15);
           display: flex;
           align-items: center;
-          padding: 0 12px;
+          padding: 0 14px;
           -webkit-app-region: drag;
           user-select: none;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
         .titlebar-title {
           flex: 1;
           font-size: 13px;
-          font-weight: 500;
-          color: #cbd5e1;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+          color: #f8fafc;
         }
 
         .titlebar-buttons {
           display: flex;
-          gap: 10px;
+          gap: 8px;
           -webkit-app-region: no-drag;
           align-items: center;
         }
 
         .titlebar-button {
-          width: 36px;
-          height: 36px;
-          background: rgba(99, 102, 241, 0.08);
-          border: 1px solid rgba(99, 102, 241, 0.15);
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          background: rgba(15, 23, 42, 0.92);
           color: #cbd5e1;
           cursor: pointer;
-          font-size: 14px;
-          border-radius: 6px;
+          transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+
+        .titlebar-button:hover {
+          transform: translateY(-1px);
+          background: rgba(71, 85, 186, 0.15);
+          color: #eef2ff;
+        }
+
+        .titlebar-button.close:hover {
+          background: rgba(239, 68, 68, 0.18);
+          color: #fecaca;
+        }
+
+        .mission-control-shell {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 280px minmax(0, 1fr);
+          gap: 16px;
+          padding: 18px;
+          overflow: hidden;
+          min-height: 0;
+          background: rgba(15, 23, 42, 0.35);
+          border-radius: 28px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 28px 80px rgba(0, 0, 0, 0.22);
+        }
+
+        .side-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          padding: 22px;
+          background: rgba(15, 23, 42, 0.96);
+          border: 1px solid rgba(99, 102, 241, 0.14);
+          border-radius: 26px;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+          overflow: hidden;
+          backdrop-filter: blur(12px);
+        }
+
+        .panel-brand {
+          font-size: 18px;
+          font-weight: 700;
+          color: #f8fafc;
+        }
+
+        .panel-description {
+          font-size: 13px;
+          line-height: 1.6;
+          color: #94a3b8;
+        }
+
+        .panel-actions {
+          display: grid;
+          gap: 10px;
+        }
+
+        .panel-btn {
+          width: 100%;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid transparent;
+          background: rgba(99, 102, 241, 0.12);
+          color: #e2e8f0;
+          text-align: left;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .panel-btn.active,
+        .panel-btn:hover {
+          background: rgba(99, 102, 241, 0.2);
+          border-color: rgba(99, 102, 241, 0.35);
+        }
+
+        .panel-summary {
+          display: grid;
+          gap: 12px;
+          padding: 16px;
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.85);
+          border: 1px solid rgba(148, 163, 184, 0.08);
+        }
+
+        .summary-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 13px;
+          color: #94a3b8;
+        }
+
+        .summary-item strong {
+          color: #e2e8f0;
+          font-weight: 700;
+        }
+
+        .control-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          overflow-y: auto;
+          min-height: 0;
+        }
+
+        .panel-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 18px;
+          padding: 20px 24px;
+          border-radius: 24px;
+          background: rgba(15, 23, 42, 0.88);
+          border: 1px solid rgba(99, 102, 241, 0.14);
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+        }
+
+        .section-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #f8fafc;
+        }
+
+        .section-subtitle {
+          margin-top: 6px;
+          font-size: 13px;
+          line-height: 1.62;
+          color: #94a3b8;
+        }
+
+        .panel-controls {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .action-btn {
+          padding: 10px 16px;
+          border-radius: 14px;
+          background: rgba(99, 102, 241, 0.14);
+          border: 1px solid rgba(99, 102, 241, 0.2);
+          color: #f8fafc;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .action-btn:hover {
+          transform: translateY(-1px);
+          background: rgba(99, 102, 241, 0.22);
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+          overflow: hidden;
+        }
+
+        .stat-card {
+          padding: 18px 20px;
+          border-radius: 22px;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid rgba(99, 102, 241, 0.12);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .stat-label {
+          font-size: 12px;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .stat-value {
+          font-size: 24px;
+          font-weight: 700;
+          color: #f8fafc;
+        }
+
+        .search-panel {
+          padding: 0 4px;
+        }
+
+        .search-panel input {
+          width: 100%;
+          padding: 14px 16px;
+          border-radius: 18px;
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          background: rgba(15, 23, 42, 0.85);
+          color: #e2e8f0;
+          font-size: 13px;
+        }
+
+        .search-panel input::placeholder {
+          color: #64748b;
+        }
+
+        .logs-panel {
+          flex: 1;
+          overflow-y: auto;
+          padding: 18px 14px;
+          border-radius: 24px;
+          background: rgba(15, 23, 42, 0.92);
+          border: 1px solid rgba(99, 102, 241, 0.14);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+        }
+
+        .log-line {
+          display: grid;
+          grid-template-columns: max-content 1fr;
+          gap: 12px;
+          padding: 10px 14px;
+          border-radius: 16px;
+          margin-bottom: 10px;
+          background: rgba(15, 23, 42, 0.8);
+          border: 1px solid rgba(148, 163, 184, 0.08);
+          word-break: break-word;
+        }
+
+        .log-badge {
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          white-space: nowrap;
+          align-self: start;
+        }
+
+        .log-message {
+          font-size: 12px;
+          color: #e2e8f0;
+          overflow-wrap: anywhere;
+        }
+
+        .log-line.info .log-badge {
+          background: rgba(148, 163, 184, 0.14);
+          color: #cbd5e1;
+        }
+
+        .log-line.success .log-badge {
+          background: rgba(16, 185, 129, 0.18);
+          color: #a7f3d0;
+        }
+
+        .log-line.warning .log-badge {
+          background: rgba(251, 191, 36, 0.18);
+          color: #fde68a;
+        }
+
+        .log-line.error .log-badge {
+          background: rgba(239, 68, 68, 0.18);
+          color: #fecaca;
+        }
+
+        .log-line.debug .log-badge {
+          background: rgba(165, 180, 252, 0.18);
+          color: #c7d2fe;
+        }
+
+        .logs-empty {
+          min-height: 260px;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          -webkit-app-region: no-drag;
-          user-select: none;
+          color: #64748b;
+          font-size: 14px;
         }
-        .titlebar-button:hover {
-          background: rgba(99, 102, 241, 0.2);
-          border-color: rgba(99, 102, 241, 0.3);
-          color: #f1f5f9;
-          transform: translateY(-1px);
+
+        .panel-tab {
+          display: none;
+          flex: 1;
+          min-height: 0;
+          flex-direction: column;
+          gap: 16px;
+          overflow: hidden;
         }
-        .titlebar-button:active {
-          transform: translateY(0);
-          background: rgba(99, 102, 241, 0.15);
+
+        .panel-tab.active {
+          display: flex;
         }
-        .titlebar-button.minimize:hover {
-          background: rgba(34, 197, 94, 0.12);
-          border-color: rgba(34, 197, 94, 0.25);
-          color: #4ade80;
+
+        .tabs-content {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          min-height: 0;
+          height: 100%;
+          overflow: hidden;
+          padding-bottom: 8px;
         }
-        .titlebar-button.maximize:hover {
-          background: rgba(59, 130, 246, 0.12);
-          border-color: rgba(59, 130, 246, 0.25);
-          color: #60a5fa;
+
+        .search-panel {
+          padding: 0 4px;
+          margin: 0 0 14px;
         }
-        .titlebar-button.close:hover {
-          background: rgba(239, 68, 68, 0.2);
-          border-color: rgba(239, 68, 68, 0.4);
-          color: #ff6b6b;
+
+        .logs-panel {
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          padding: 18px 14px;
         }
-        .titlebar-button.close:active {
-          background: rgba(239, 68, 68, 0.25);
+
+        .subsection-heading {
+          font-size: 16px;
+          font-weight: 700;
+          color: #eef2ff;
+          margin-bottom: 14px;
+        }
+
+        .summary-grid,
+        .diagnostics-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .summary-card,
+        .diagnostic-card {
+          padding: 18px;
+          border-radius: 20px;
+          background: rgba(15, 23, 42, 0.88);
+          border: 1px solid rgba(99, 102, 241, 0.12);
+        }
+
+        .summary-title,
+        .diagnostic-label {
+          font-size: 12px;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 8px;
+        }
+
+        .summary-value,
+        .diagnostic-value {
+          font-size: 20px;
+          font-weight: 700;
+          color: #f8fafc;
         }
       </style>
     </head>
@@ -838,43 +1053,135 @@ function createLogsWindow() {
         <div class="titlebar-title">Mission Control / ${LAUNCHER_NAME}</div>
         <div class="titlebar-buttons">
           <button class="titlebar-button minimize" id="minimize-btn" title="Réduire">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
           <button class="titlebar-button maximize" id="maximize-btn" title="Agrandir">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2" ry="2"/></svg>
           </button>
           <button class="titlebar-button close" id="close-btn" title="Fermer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       </div>
 
-      <div class="logs-header">
-        <div class="logs-header-left">
-          <div class="logs-title">📋 Logs de lancement</div>
-          <div class="logs-search">
-            <input type="text" id="search-input" placeholder="Search logs...">
+      <div class="mission-control-shell">
+        <aside class="side-panel">
+          <div class="panel-brand">Mission Control</div>
+          <div class="panel-description">Vue centrale des logs et de l'état du lanceur.</div>
+          <div class="panel-actions">
+            <button class="panel-btn active" data-tab="logs">Logs</button>
+            <button class="panel-btn" data-tab="summary">Résumé</button>
+            <button class="panel-btn" data-tab="diagnostics">Diagnostics</button>
+          </div>
+          <div class="panel-summary">
+            <div class="summary-item">
+              <span>Version</span>
+              <strong>${LAUNCHER_VERSION || 'N/A'}</strong>
+            </div>
+            <div class="summary-item">
+              <span>Statut</span>
+              <strong id="status-badge">Connecté</strong>
+            </div>
+          </div>
+        </aside>
+
+        <main class="control-panel">
+          <section class="panel-top">
+            <div>
+              <div class="section-title">Gestion de mission</div>
+              <div class="section-subtitle">Surveillez les journaux, filtrez les erreurs et gardez un œil sur l'état du launcher.</div>
+            </div>
+            <div class="panel-controls">
+              <button class="action-btn" id="clear-btn" title="Effacer les logs">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14"/></svg>
+                Effacer
+              </button>
+              <button class="action-btn" id="copy-btn" title=" Copier tout">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                 Copier
+              </button>
+            </div>
+          </section>
+
+          <section class="tabs-content">
+            <div class="panel-tab active" id="tab-logs">
+              <section class="stats-grid">
+            <article class="stat-card">
+              <div class="stat-label">Total logs</div>
+              <div class="stat-value" id="total-logs">0</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Erreurs</div>
+              <div class="stat-value" id="error-count">0</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Warnings</div>
+              <div class="stat-value" id="warning-count">0</div>
+            </article>
+            <article class="stat-card">
+              <div class="stat-label">Dernier log</div>
+              <div class="stat-value" id="last-log">Aucun</div>
+            </article>
+          </section>
+
+          <section class="search-panel">
+            <input type="text" id="search-input" placeholder="Rechercher dans les logs...">
+          </section>
+
+          <section class="logs-panel" id="logs-container">
+            <div class="logs-empty">Aucun log disponible pour le moment.</div>
+          </section>
+        </div>
+
+        <div class="panel-tab" id="tab-summary">
+          <div class="subsection-heading">Résumé</div>
+          <div class="summary-grid">
+            <article class="summary-card">
+              <div class="summary-title">Logs totaux</div>
+              <div class="summary-value" id="summary-total-logs">0</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-title">Erreurs</div>
+              <div class="summary-value" id="summary-error-count">0</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-title">Warnings</div>
+              <div class="summary-value" id="summary-warning-count">0</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-title">Dernier log</div>
+              <div class="summary-value" id="summary-last-log">Aucun</div>
+            </article>
           </div>
         </div>
-        <div class="logs-buttons">
-          <button class="logs-btn" id="clear-btn" title=Effacer>${icons.trash}</button>
-          <button class="logs-btn" id="copy-btn" title=Copier tout>${icons.clipboard}</button>
-        </div>
-      </div>
 
-      <div class="logs-container" id="logs-container">
-        <div class="logs-empty" style="display:flex; align-items:center; justify-content:center; height:100%; color:#64748b;">No logs found. Launch game to generate some!</div>
+        <div class="panel-tab" id="tab-diagnostics">
+          <div class="subsection-heading">Diagnostics</div>
+          <div class="diagnostics-grid">
+            <div class="diagnostic-card">
+              <div class="diagnostic-label">Statut réseau</div>
+              <div class="diagnostic-value" id="diagnostic-network">Vérification en cours...</div>
+            </div>
+            <div class="diagnostic-card">
+              <div class="diagnostic-label">Version de l'application</div>
+              <div class="diagnostic-value">${LAUNCHER_VERSION || 'N/A'}</div>
+            </div>
+            <div class="diagnostic-card">
+              <div class="diagnostic-label">OS</div>
+              <div class="diagnostic-value" id="diagnostic-os">${os.type()} ${os.release()}</div>
+            </div>
+            <div class="diagnostic-card">
+              <div class="diagnostic-label">Architecture</div>
+              <div class="diagnostic-value">${os.arch()}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+        </main>
       </div>
 
       <script>
-        const { ipcRenderer } = require('electron');
+        const { clipboard, ipcRenderer } = require('electron');
 
         const logsContainer = document.getElementById('logs-container');
         const searchInput = document.getElementById('search-input');
@@ -883,40 +1190,109 @@ function createLogsWindow() {
         const minimizeBtn = document.getElementById('minimize-btn');
         const maximizeBtn = document.getElementById('maximize-btn');
         const closeBtn = document.getElementById('close-btn');
-        
+        const totalLogsEl = document.getElementById('total-logs');
+        const errorCountEl = document.getElementById('error-count');
+        const warningCountEl = document.getElementById('warning-count');
+        const lastLogEl = document.getElementById('last-log');
+        const summaryTotalLogsEl = document.getElementById('summary-total-logs');
+        const summaryErrorCountEl = document.getElementById('summary-error-count');
+        const summaryWarningCountEl = document.getElementById('summary-warning-count');
+        const summaryLastLogEl = document.getElementById('summary-last-log');
+        const statusBadge = document.getElementById('status-badge');
+        const diagnosticNetwork = document.getElementById('diagnostic-network');
+        const tabButtons = document.querySelectorAll('.panel-btn');
+        const tabPanels = document.querySelectorAll('.panel-tab');
+
         let allLogs = [];
         let filteredLogs = [];
 
-        // Ajouter un log
-        ipcRenderer.on('add-log', (event, log) => {
-          allLogs.push(log);
-          filterLogs();
-          scrollToBottom();
-        });
+        function getCopyButtonHtml(label = ' Copier') {
+          return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>' + label;
+        }
 
-        // Remplacer tous les logs
-        ipcRenderer.on('set-logs', (event, logs) => {
-          allLogs = logs;
-          filterLogs();
-          scrollToBottom();
-        });
+        function refreshDiagnostics() {
+          const online = navigator.onLine;
+          diagnosticNetwork.textContent = online ? 'En ligne' : 'Hors ligne';
+          statusBadge.textContent = online ? 'Connecté' : 'Hors ligne';
+        }
 
-        // Recherche
-        searchInput.addEventListener('input', () => {
-          filterLogs();
-        });
+        function resetCopyButton() {
+          copyBtn.innerHTML = getCopyButtonHtml(' Copier');
+        }
+
+        function activateTab(tab) {
+          tabButtons.forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
+          tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === 'tab-' + tab));
+        }
 
         function filterLogs() {
           const query = searchInput.value.toLowerCase();
-          if (!query) {
-            filteredLogs = [...allLogs];
-          } else {
-            filteredLogs = allLogs.filter(log => 
-              log.message.toLowerCase().includes(query)
-            );
-          }
+          filteredLogs = query
+            ? allLogs.filter(log => log.message.toLowerCase().includes(query))
+            : [...allLogs];
           renderLogs();
         }
+
+        function setMaximizeButtonState(maximized) {
+          if (maximized) {
+            maximizeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12V5a2 2 0 0 1 2-2h7"/><path d="M19 12V19a2 2 0 0 1-2 2H10"/><path d="M19 5h-7v7"/><path d="M10 19V10H19"/></svg>';
+            maximizeBtn.title = 'Restaurer';
+          } else {
+            maximizeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2" ry="2"/></svg>';
+            maximizeBtn.title = 'Agrandir';
+          }
+        }
+
+        tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            activateTab(button.dataset.tab);
+          });
+        });
+
+        searchInput.addEventListener('input', filterLogs);
+
+        clearBtn.addEventListener('click', () => {
+          allLogs = [];
+          filteredLogs = [];
+          renderLogs();
+          updateStats();
+          ipcRenderer.send('clear-logs');
+        });
+
+        copyBtn.addEventListener('click', () => {
+          const text = filteredLogs.map(log => '[' + log.type.toUpperCase() + '] ' + log.message).join('\\n');
+          clipboard.writeText(text);
+          copyBtn.innerHTML = '✓ Copié';
+          setTimeout(resetCopyButton, 2000);
+        });
+
+        minimizeBtn.addEventListener('click', () => ipcRenderer.send('minimize-logs-window'));
+        maximizeBtn.addEventListener('click', () => ipcRenderer.send('maximize-logs-window'));
+        closeBtn.addEventListener('click', () => ipcRenderer.send('close-logs-window'));
+
+        ipcRenderer.on('add-log', (event, log) => {
+          allLogs.push(log);
+          filterLogs();
+          updateStats();
+          scrollToBottom();
+        });
+
+        ipcRenderer.on('set-logs', (event, logs) => {
+          allLogs = logs;
+          filterLogs();
+          updateStats();
+          scrollToBottom();
+        });
+
+        ipcRenderer.on('window-maximized', () => setMaximizeButtonState(true));
+        ipcRenderer.on('window-unmaximized', () => setMaximizeButtonState(false));
+
+        window.addEventListener('online', refreshDiagnostics);
+        window.addEventListener('offline', refreshDiagnostics);
+        refreshDiagnostics();
+        resetCopyButton();
+        activateTab('logs');
+        updateStats();
 
         function renderLogs() {
           if (filteredLogs.length === 0) {
@@ -924,40 +1300,42 @@ function createLogsWindow() {
             return;
           }
 
-          logsContainer.innerHTML = filteredLogs.map(log => {
-            return \`<div class="log-line \${log.type}">\${log.message}</div>\`;
+          logsContainer.innerHTML = filteredLogs.map(function(log) {
+            return '<div class="log-line ' + log.type + '">' +
+                   '<div class="log-badge">' + escapeHtml(log.type.toUpperCase()) + '</div>' +
+                   '<div class="log-message">' + escapeHtml(log.message) + '</div>' +
+                   '</div>';
           }).join('');
+        }
+
+        function updateStats() {
+          const errorCount = allLogs.filter(log => log.type === 'error').length;
+          const warningCount = allLogs.filter(log => log.type === 'warning').length;
+          totalLogsEl.textContent = allLogs.length;
+          errorCountEl.textContent = errorCount;
+          warningCountEl.textContent = warningCount;
+          lastLogEl.textContent = allLogs.length ? new Date().toLocaleTimeString() : 'Aucun';
+
+          summaryTotalLogsEl.textContent = allLogs.length;
+          summaryErrorCountEl.textContent = errorCount;
+          summaryWarningCountEl.textContent = warningCount;
+          summaryLastLogEl.textContent = allLogs.length ? new Date().toLocaleTimeString() : 'Aucun';
         }
 
         function scrollToBottom() {
           logsContainer.scrollTop = logsContainer.scrollHeight;
         }
 
-        clearBtn.addEventListener('click', () => {
-          allLogs = [];
-          filteredLogs = [];
-          renderLogs();
-          ipcRenderer.send('clear-logs');
-        });
+        function escapeHtml(text) {
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        }
 
-        copyBtn.addEventListener('click', () => {
-          const text = filteredLogs.map(log => log.message).join('\\n');
-          require('electron').clipboard.writeText(text);
-          copyBtn.textContent = '✓ Copié !';
-          setTimeout(() => copyBtn.textContent = '📋 Copier tout', 2000);
-        });
-
-        minimizeBtn.addEventListener('click', () => {
-          ipcRenderer.send('minimize-logs-window');
-        });
-
-        maximizeBtn.addEventListener('click', () => {
-          ipcRenderer.send('maximize-logs-window');
-        });
-
-        closeBtn.addEventListener('click', () => {
-          ipcRenderer.send('close-logs-window');
-        });
+        updateStats();
       </script>
     </body>
     </html>
@@ -1541,6 +1919,8 @@ ipcMain.handle('login-microsoft', async (event, options = {}) => {
           console.log('💾 [login-microsoft] Updating accessToken in store');
           store.set('authData', existing);
         }
+
+        await _msAuthInstance.showBriefLoadingWindow(8000);
         
         // 🎮 INITIALISER DISCORD EN ARRIÈRE-PLAN (NON-BLOQUANT)
         const discordEnabled = store.get('discord.rpcEnabled', true);
@@ -1839,7 +2219,8 @@ function showNotification(type, title, body, options = {}) {
     const notif = new Notification({
       title,
       body,
-      icon: getIconPath()
+      icon: getIconPath(),
+      silent: true
     });
     notif.show();
 
@@ -1897,7 +2278,8 @@ ipcMain.handle('test-notification', async (event, options = {}) => {
     const notif = new Notification({
       title: 'Test de notification',
       body: `Ceci est un test de notification ${LAUNCHER_NAME}`,
-      icon: getIconPath()
+      icon: getIconPath(),
+      silent: true
     });
 
     notif.show();
@@ -2408,6 +2790,7 @@ ipcMain.handle('get-settings', async () => {
     discordRPC: false,
     defaultServer: '',
     closeLauncherOnLaunch: false,
+    missionControlFullscreen: false,
     showLogsWindow: true,
     useProtocolConnect: true,
     mcWidth: 1280,
@@ -2594,14 +2977,14 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
     try {
       // ✅ LANCER MINECRAFT
       console.log('🚀 Lancement en cours...');
-      
-    const sendLog = (type, message) => {
-      try {
-        if (logsWindow && !logsWindow.isDestroyed()) {
-          logsWindow.webContents.send('add-log', { type, message });
-        }
-      } catch (_) {}
-    };
+
+      const sendLog = (type, message) => {
+        try {
+          if (logsWindow && !logsWindow.isDestroyed()) {
+            logsWindow.webContents.send('add-log', { type, message });
+          }
+        } catch (_) {}
+      };
     
       // Notification de connexion en cours si un serveur est ciblé
       try {
@@ -2649,7 +3032,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
         console.log(`🧩 Profil modde detecte pour le lancement: ${linkedModdedProfile.name} (${effectiveProfile.loader})`);
       }
 
-      const result = await launcher.launch({
+      const launchPromise = launcher.launch({
         authData: authData,
         version: effectiveProfile.version,
         loader: effectiveProfile.loader || 'vanilla',
@@ -2687,7 +3070,7 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
               message: progress.message
             });
           }
-          
+
           // Log de progression
           console.log(`📊 ${progress.type}: ${progress.percent}%`);
           try {
@@ -2698,71 +3081,91 @@ ipcMain.handle('launch-minecraft', async (event, profile, serverIP) => {
         }
       });
 
-      if (result.downloadedVersion) {
-        showNotification('download', 'Téléchargement terminé', `Minecraft ${result.downloadedVersion} a été téléchargé et va se lancer.`);
-      }
-      console.log('✅ Résultat lancement:', result);
-      
-      // Si le client s'est fermé immédiatement avec code non nul, notifier
-      if (typeof result.code === 'number' && result.code !== 0) {
+      void launchPromise.then(async (result) => {
         try {
-          const { Notification } = require('electron');
-          const notif = new Notification({
-            title: 'Minecraft s’est fermé',
-            body: `Code de sortie: ${result.code}`,
-            icon: getIconPath()
-          });
-          notif.show();
-        } catch (_) {}
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('launch-error', `Fermeture immédiate (code ${result.code})`);
-        }
-      }
+          if (result?.downloadedVersion) {
+            showNotification('download', 'Téléchargement terminé', `Minecraft ${result.downloadedVersion} a été téléchargé et va se lancer.`);
+          }
+          console.log('✅ Résultat lancement:', result);
 
-      // ✅ METTRE À JOUR DISCORD RPC (avec vérification)
-      if (discordRPC && discordRPC.isConnected) {
-        try {
-          console.log('📡 Mise à jour Discord RPC...');
-          await discordRPC.setPlaying(profile.version);
-          console.log('✅ Discord RPC mis à jour');
-        } catch (error) {
-          console.error('⚠️ Erreur Discord RPC:', error.message);
-          // Ne pas bloquer le lancement si Discord échoue
+          // Si le client s'est fermé immédiatement avec code non nul, notifier
+          if (typeof result?.code === 'number' && result.code !== 0) {
+            try {
+              const { Notification } = require('electron');
+              const notif = new Notification({
+                title: 'Minecraft s’est fermé',
+                body: `Code de sortie: ${result.code}`,
+                icon: getIconPath(),
+                silent: true
+              });
+              notif.show();
+            } catch (_) {}
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('launch-error', `Fermeture immédiate (code ${result.code})`);
+            }
+          }
+
+          // ✅ METTRE À JOUR DISCORD RPC (avec vérification)
+          if (discordRPC && discordRPC.isConnected) {
+            try {
+              console.log('📡 Mise à jour Discord RPC...');
+              await discordRPC.setPlaying(profile.version);
+              console.log('✅ Discord RPC mis à jour');
+            } catch (error) {
+              console.error('⚠️ Erreur Discord RPC:', error.message);
+              // Ne pas bloquer le lancement si Discord échoue
+            }
+          } else {
+            console.log('⚠️ Discord RPC non disponible (normal si Discord fermé)');
+          }
+
+          // ✅ NOTIFICATION: Lancement réussi
+          showNotification('launch', 'Minecraft lancé', serverIP ? `Connexion à ${serverIP}` : 'Bon jeu !');
+
+          console.log('='.repeat(60));
+          console.log('✅ LANCEMENT TERMINÉ');
+          console.log('='.repeat(60));
+
+          // Fermer/masquer le launcher si choisi
+          try {
+            if (settings.closeLauncherOnLaunch && mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.hide();
+              console.log('🪟 Launcher masqué (paramètre activé)');
+            }
+          } catch (_) {}
+        } catch (launchError) {
+          console.error('❌ Erreur lors du lancement:', launchError);
+          console.error('Stack:', launchError.stack);
+          showNotification('error', 'Erreur de lancement', launchError.message || 'Une erreur est survenue');
+          minecraftRunning = false;
         }
-      } else {
-        console.log('⚠️ Discord RPC non disponible (normal si Discord fermé)');
-      }
-      
-      // ✅ NOTIFICATION: Lancement réussi
-      showNotification('launch', 'Minecraft lancé', serverIP ? `Connexion à ${serverIP}` : 'Bon jeu !');
-      
+      }).catch((launchError) => {
+        console.error('❌ Erreur lors du lancement:', launchError);
+        console.error('Stack:', launchError.stack);
+        showNotification('error', 'Erreur de lancement', launchError.message || 'Une erreur est survenue');
+        minecraftRunning = false;
+      });
+
       console.log('='.repeat(60));
-      console.log('✅ LANCEMENT TERMINÉ');
+      console.log('✅ LANCEMENT INITIALISÉ');
       console.log('='.repeat(60));
-      
-      // Fermer/masquer le launcher si choisi
-      try {
-        if (settings.closeLauncherOnLaunch && mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.hide();
-          console.log('🪟 Launcher masqué (paramètre activé)');
-        }
-      } catch (_) {}
-      
+
       return {
-        success: result.success !== false,
-        message: result.error ? `Erreur: ${result.error}` : 'Minecraft lancé avec succès !'
+        success: true,
+        message: 'Lancement de Minecraft initialisé.',
+        launched: true
       };
 
     } catch (launchError) {
       console.error('❌ Erreur lors du lancement:', launchError);
       console.error('Stack:', launchError.stack);
-      
+
       // ❌ NOTIFICATION: Erreur de lancement
       showNotification('error', 'Erreur de lancement', launchError.message || 'Une erreur est survenue');
-      
+
       // ✅ Réinitialiser l'état
       minecraftRunning = false;
-      
+
       return {
         success: false,
         error: `Erreur de lancement: ${launchError.message}`
@@ -3040,6 +3443,16 @@ ipcMain.on('toggle-fullscreen', (event, isFullscreen) => {
       mainWindow.maximize();
     } else {
       mainWindow.unmaximize();
+    }
+  }
+});
+
+ipcMain.on('set-logs-fullscreen', (event, isFullscreen) => {
+  if (logsWindow && !logsWindow.isDestroyed()) {
+    if (isFullscreen) {
+      logsWindow.maximize();
+    } else {
+      logsWindow.unmaximize();
     }
   }
 });
@@ -4956,25 +5369,6 @@ ipcMain.on('close-window', () => {
 
 ipcMain.on('open-external', (event, url) => {
   require('electron').shell.openExternal(url);
-});
-
-// ✅ HANDLERS POUR LA FENÊTRE DE LOGS
-ipcMain.on('minimize-logs-window', () => {
-  if (logsWindow && !logsWindow.isDestroyed()) logsWindow.minimize();
-});
-
-ipcMain.on('maximize-logs-window', () => {
-  if (logsWindow && !logsWindow.isDestroyed()) {
-    logsWindow.isMaximized() ? logsWindow.unmaximize() : logsWindow.maximize();
-  }
-});
-
-ipcMain.on('close-logs-window', () => {
-  if (logsWindow && !logsWindow.isDestroyed()) logsWindow.close();
-});
-
-ipcMain.on('clear-logs', () => {
-  currentLogs = [];
 });
 
 ipcMain.on('settings-window-ready', () => {

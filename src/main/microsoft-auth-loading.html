@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connexion Microsoft</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #060816;
+      --panel: rgba(15, 23, 42, 0.92);
+      --border: rgba(148, 163, 184, 0.22);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-soft: rgba(99, 102, 241, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at top, #172554 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(100%, 540px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: 0 24px 70px rgba(2, 8, 23, 0.45);
+      padding: 28px 28px 24px;
+      backdrop-filter: blur(16px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 12px 30px rgba(99, 102, 241, 0.28);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: var(--accent);
+      margin: 18px auto 16px;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .steps {
+      margin: 16px 0 10px;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+
+    .steps li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .steps strong {
+      color: #f8fafc;
+      display: inline-block;
+      min-width: 28px;
+      text-align: center;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      padding: 2px 7px;
+      margin-top: 1px;
+    }
+
+    .note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(99, 102, 241, 0.18);
+      border-radius: 14px;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="badge">V</div>
+      <div>
+        <h1 class="title">Connexion Microsoft</h1>
+        <p class="subtitle">Sécurisée, rapide et entièrement gérée par votre navigateur.</p>
+      </div>
+    </div>
+
+    <div class="spinner"></div>
+
+    <ul class="steps">
+      <li><strong>1</strong> Connectez-vous à votre compte Microsoft</li>
+      <li><strong>2</strong> Confirmez l’autorisation d’accès au launcher</li>
+      <li><strong>3</strong> Revenez automatiquement dans Velkora</li>
+    </ul>
+
+    <div class="note">
+      Merci de patienter le temps du chargement de la fenêtre de connexion Microsoft. Si cela prend plus d’une minute, merci de contacter le support.
+      <br /><br />
+      Votre mot de passe et vos données sensibles restent protégés par Microsoft. Le launcher n’enregistre que les informations nécessaires pour lancer Minecraft.
+    </div>
+  </div>
+</body>
+</html>

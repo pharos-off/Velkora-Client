@@ -1,10 +1,15 @@
 # Changelog
 
-## [Unreleased] - 2026-06-25
+## [Unreleased] - 2026-07-05
 
-- Correction : démarrage automatique sous Windows attend désormais la connexion Internet avant d’afficher l’interface principale.
-- Correction : détection réseau renforcée au démarrage avec vérification DNS, connexion TCP et plusieurs requêtes HTTP vers des serveurs fiables.
-- Correction : ajout de la prise en charge IPC `check-online` et `network-status` dans `preload.js` pour éviter le blocage des vérifications réseau côté renderer.
-- Correction : comportement de secours dans le renderer utilisant `navigator.onLine` afin de ne pas afficher un faux message hors ligne lorsque le PC est connecté.
-- Amélioration : lancement Minecraft forcé avec `javaw` après le téléchargement pour éviter l’ouverture de la console Java.
-- Amélioration : prévention du double démarrage de Minecraft après fermeture de l’instance lancée depuis le launcher.
+- Correction : fix du crash de démarrage `Store is not a constructor` en important `electron-store` via son export par défaut dans `src/main/security-manager.js`, `src/main/microsoft-auth.js` et `src/main/index.js`.
+- Correction : fix de l'erreur `fetch is not a function` dans le contrôle des mises à jour en important `node-fetch` via son export par défaut.
+- Mise à jour : versions des dépendances principales (`electron`, `systeminformation`, `node-fetch`, `minecraft-launcher-core`, `minecraft-protocol`, `sharp`, etc.) et correction des incompatibilités liées au chargement des modules.
+- Ajout : option de paramètres pour afficher Mission Control en plein écran.
+- Ajout : `missionControlFullscreen` désormais stocké dans les paramètres et pris en compte lors de la création de la fenêtre Mission Control.
+- Correction : le mode Mission Control plein écran utilise maintenant une maximisation fenêtrée plutôt qu’une vraie mise en plein écran natif.
+- Amélioration : alignement visuel de Mission Control avec le thème principal du launcher, y compris le fond, les panneaux et la barre de titre.
+- Ajout : remplacement du son de notification synthétique par le fichier WAV `assets/sound-notification.wav` pour toutes les notifications.
+- Correction : suppression du son système par défaut de Windows sur les notifications Electron en les rendant silencieuses et en gardant uniquement le son local personnalisé.
+- Amélioration : ajout d’un message d’attente dans la fenêtre de connexion Microsoft indiquant de patienter pendant le chargement et de contacter le support si l’ouverture dépasse une minute.
+- Ajout : sauvegarde persistante des favoris radio dans le player radio.

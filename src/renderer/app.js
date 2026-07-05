@@ -2762,13 +2762,6 @@ renderMainLayout() {
   renderPartnersView() {
     const partners = [
       { 
-        name: 'Noctem | Minecraft Server',
-        logo: icons.shield,
-        description: 'Un serveur Minecraft publique pour les fans de LIFESTEAL, SURVIE, PVP et bien plus !',
-        website: '',
-        joinUrl: ''
-      },
-      { 
         name: 'LunaVerse',
         logo: icons.moon,
         description: 'Un serveur communautaire rassemblant plusieurs projets !',
@@ -3507,7 +3500,6 @@ renderMainLayout() {
           await this.loadData();
           this.render();
         } else {
-          alert('Erreur de connexion Microsoft');
           microsoftBtn.disabled = false;
           microsoftBtn.textContent = 'Se connecter avec Microsoft';
         }
@@ -3866,7 +3858,7 @@ renderMainLayout() {
 
     // ✅ CONTACT PARTENAIRES
     document.getElementById('contact-partner-btn')?.addEventListener('click', () => {
-      window.electron.shell.openExternal('mailto:contact.vellkoramc@gmail.com?subject=Devenir Partenaire');
+      window.electron.shell.openExternal('mailto:contact.pharos.pro@gmail.com?subject=Devenir Partenaire');
     });
 
     // ✅ NETTOYER LES ANCIENS LISTENERS AVANT D'EN AJOUTER DE NOUVEAUX
@@ -4472,6 +4464,27 @@ renderMainLayout() {
     ];
   }
 
+  getRadioFavorites() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('radioFavorites') || '[]'));
+    } catch (error) {
+      console.warn('[Radio] Impossible de lire les favoris :', error);
+      return new Set();
+    }
+  }
+
+  saveRadioFavorites(favs) {
+    try {
+      localStorage.setItem('radioFavorites', JSON.stringify(Array.from(favs)));
+    } catch (error) {
+      console.warn('[Radio] Impossible de sauvegarder les favoris :', error);
+    }
+  }
+
+  getRadioOnlyFavFilter() {
+    return localStorage.getItem('radioOnlyFav') === '1';
+  }
+
   openRadioPlayer() {
     // ✅ Utiliser une instance globale plutôt que de recréer
     let modal = document.getElementById('radio-modal');
@@ -4522,8 +4535,8 @@ renderMainLayout() {
       // Récupérer les données sauvegardées
       const vol = parseFloat(localStorage.getItem('radioVolume') || '0.6');
       const stations = this.getRadioStations();
-      const favs = new Set(JSON.parse(localStorage.getItem('radioFavorites') || '[]'));
-      const onlyFav = localStorage.getItem('radioOnlyFav') === '1';
+      const favs = this.getRadioFavorites();
+      const onlyFav = this.getRadioOnlyFavFilter();
       
       // Construire le HTML
       const html = `
@@ -4632,11 +4645,11 @@ renderMainLayout() {
           } else {
             favs.add(url);
           }
-          localStorage.setItem('radioFavorites', JSON.stringify(Array.from(favs)));
-          star.classList.toggle('active');
-          if (favFilterBtn?.classList.contains('active')) render();
+          this.saveRadioFavorites(favs);
+          render();
           return;
         }
+
         const card = e.target.closest('.radio-card');
         if (card) {
           setSrc(card.dataset.name, card.dataset.url);
@@ -4644,8 +4657,6 @@ renderMainLayout() {
       });
     }
 
-    if (searchEl) searchEl.addEventListener('input', render);
-    
     if (favFilterBtn) {
       favFilterBtn.addEventListener('click', () => {
         favFilterBtn.classList.toggle('active');
@@ -5361,27 +5372,26 @@ renderMainLayout() {
   }
 }
 
-let notificationAudioContext = null;
+const path = require('path');
+let notificationAudio = null;
+const notificationSoundPath = path.resolve(__dirname, '../../assets/sound-notification.wav');
+const notificationSoundUrl = `file://${notificationSoundPath.replace(/\\/g, '/')}`;
+
 function playNotificationSound(volume = 0.5) {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    if (!notificationAudioContext) {
-      notificationAudioContext = new AudioContext();
+    if (!notificationAudio) {
+      notificationAudio = new Audio();
+      notificationAudio.preload = 'auto';
     }
 
-    const oscillator = notificationAudioContext.createOscillator();
-    const gainNode = notificationAudioContext.createGain();
-    gainNode.gain.value = Math.max(0, Math.min(volume, 1)) * 0.25;
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 880;
-    oscillator.connect(gainNode);
-    gainNode.connect(notificationAudioContext.destination);
-    oscillator.start();
-    oscillator.stop(notificationAudioContext.currentTime + 0.12);
-    oscillator.onended = () => {
-      try { oscillator.disconnect(); gainNode.disconnect(); } catch (_) {}
-    };
+    notificationAudio.src = notificationSoundUrl;
+    notificationAudio.volume = Math.max(0, Math.min(volume, 1));
+    notificationAudio.currentTime = 0;
+
+    const playPromise = notificationAudio.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(() => {});
+    }
   } catch (error) {
     console.warn('Unable to play notification sound:', error);
   }
