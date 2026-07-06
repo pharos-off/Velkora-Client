@@ -2539,12 +2539,13 @@ renderMainLayout() {
 
   // ✅ PAGE VERSIONS
   renderVersionsView() {
+    const channelBadge = LauncherVersion.getChannelBadge();
     const html = `
       <div class="view-container">
         <div style="margin-bottom: 40px;">
           <h1 class="view-title">Versions</h1>
           <p style="color: #94a3b8; margin-top: 12px; font-size: 15px;">
-            Informations sur le launcher et les mises à jour disponibles
+            Informations sur le launcher et son état de mise à jour.
           </p>
         </div>
 
@@ -2556,13 +2557,13 @@ renderMainLayout() {
           padding: 24px;
           margin-bottom: 24px;
         ">
-          <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 20px;">
             <div>
-              <p style="color: #94a3b8; margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Version Actuelle</p>
+              <p style="color: #94a3b8; margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Version du launcher</p>
               <h2 style="color: #e2e8f0; margin: 0 0 4px 0; font-size: 28px; font-weight: 700;">
-                ${LauncherVersion.getVersionString()}
+                ${LauncherVersion.getFullVersionWithBuild()}
               </h2>
-              <p style="color: #64748b; margin: 0; font-size: 13px;">Build ${LauncherVersion.getBuild()}</p>
+              <p style="color: #64748b; margin: 0; font-size: 13px;">${LauncherVersion.releaseDate} · ${LauncherVersion.channel}</p>
             </div>
             <div id="update-status-badge" style="
               padding: 12px 20px;
@@ -2578,9 +2579,8 @@ renderMainLayout() {
           </div>
         </div>
 
-        <!-- Grille d'informations -->
+        <!-- Cartes d'actions -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 30px;">
-          <!-- Carte 1: Mises à jour -->
           <div style="
             background: rgba(30, 41, 59, 0.6);
             border: 1px solid rgba(99, 102, 241, 0.15);
@@ -2590,15 +2590,14 @@ renderMainLayout() {
           ">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
               <span style="font-size: 24px;">${icons.download}</span>
-              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Mises à jour</h3>
+              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Vérifier les mises à jour</h3>
             </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Vérifier les dernières mises à jour disponibles</p>
+            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Cherche une nouvelle version du launcher.</p>
             <button id="btn-check-updates" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
               Vérifier maintenant
             </button>
           </div>
 
-          <!-- Carte 2: Historique -->
           <div style="
             background: rgba(30, 41, 59, 0.6);
             border: 1px solid rgba(99, 102, 241, 0.15);
@@ -2608,15 +2607,14 @@ renderMainLayout() {
           ">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
               <span style="font-size: 24px;">${icons.calendar}</span>
-              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Historique</h3>
+              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Historique des releases</h3>
             </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Consulter l'historique des mises à jour</p>
+            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Voir les versions publiées du launcher.</p>
             <button id="btn-view-history" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
               Voir l'historique
             </button>
           </div>
 
-          <!-- Carte 3: Changelog -->
           <div style="
             background: rgba(30, 41, 59, 0.6);
             border: 1px solid rgba(99, 102, 241, 0.15);
@@ -2628,14 +2626,14 @@ renderMainLayout() {
               <span style="font-size: 24px;">${icons.newspaper}</span>
               <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Changelog</h3>
             </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Lire les derniers changements et améliorations</p>
+            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Lire les derniers changements du launcher.</p>
             <button id="btn-read-changelog" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
               Lire le changelog
             </button>
           </div>
         </div>
 
-        <!-- Section informations -->
+        <!-- Section d'informations détaillées -->
         <div style="
           background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%);
           border: 1px solid rgba(99, 102, 241, 0.2);
@@ -2643,26 +2641,39 @@ renderMainLayout() {
           padding: 24px;
         ">
           <h3 style="margin: 0 0 16px 0; color: #6366f1; display: flex; align-items: center; gap: 8px; font-size: 16px;">
-            ℹ️ Informations sur le launcher
+            ℹ️ Informations du launcher
           </h3>
-          
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
             <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Nom du launcher</p>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Nom</p>
               <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getName()}</p>
             </div>
             <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Numéro de build</p>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Version</p>
+              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getVersion()}</p>
+            </div>
+            <div>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Build</p>
               <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getBuild()}</p>
             </div>
             <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Mises à jour automatiques</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">Activées</p>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Date de sortie</p>
+              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.releaseDate}</p>
             </div>
             <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">État</p>
-              <p style="color: #4ade80; margin: 0; font-size: 14px;">Opérationnel</p>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Canal</p>
+              <p style="color: ${channelBadge.color}; margin: 0; font-size: 14px;">${channelBadge.text}</p>
             </div>
+            <div>
+              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Auteur</p>
+              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.author}</p>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; padding: 18px; background: rgba(15, 23, 42, 0.65); border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.15);">
+            <p style="color: #cbd5e1; margin: 0 0 10px 0; font-size: 14px;">Cette page affiche uniquement les informations du launcher.</p>
+            <p style="color: #94a3b8; margin: 0; font-size: 13px;">Les versions Minecraft sont gérées séparément dans la configuration et le lancement du jeu.</p>
           </div>
         </div>
       </div>
@@ -3492,7 +3503,8 @@ renderMainLayout() {
         microsoftBtn.disabled = true;
         microsoftBtn.textContent = 'Connexion en cours...';
         
-        const result = await ipcRenderer.invoke('login-microsoft', { forcePrompt: true });
+        // Ne pas forcer le prompt Microsoft pour conserver le compte précédemment connecté
+        const result = await ipcRenderer.invoke('login-microsoft', { forcePrompt: false });
         
         if (result.success) {
           this.authData = result.data;

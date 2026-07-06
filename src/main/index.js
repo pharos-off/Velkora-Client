@@ -123,8 +123,8 @@ async function waitForInternet(timeoutMs = 15000, intervalMs = 2500) {
   return false;
 }
 
-const LAUNCHER_VERSION = '4.4.0';
-const LAUNCHER_BUILD = '20260705';
+const LAUNCHER_VERSION = '4.4.1';
+const LAUNCHER_BUILD = '20260706';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {
@@ -1465,21 +1465,10 @@ app.on('ready', () => {
     // Clean up old installer files
     cleanupOldInstallers();
     
-    session.defaultSession.clearCache().catch(() => {});
-    session.defaultSession.clearStorageData().catch(() => {});
-  } catch (e) {
-    console.log('Cache cleanup (non-critical):', e?.message);
-  }
-});
-
-ipcMain.on('settings-updated', (event, settings) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('settings-updated', settings);
-  }
-});
-/*
-// ✅ ENVOYER LE CHEMIN DES ASSETS POUR LA MUSIQUE (HORS DE app.asar)
-ipcMain.handle('get-assets-path', async () => {
+      // Ne pas effacer le storage local du renderer ici :
+      // cela supprime les thèmes et accents enregistrés.
+      session.defaultSession.clearCache().catch(() => {});
+      // session.defaultSession.clearStorageData().catch(() => {});
   // Utiliser process.resourcesPath qui pointe vers le dossier resources/
   // Les extraResources (music/) y sont extraits automatiquement
   let musicPath;
@@ -1494,8 +1483,12 @@ ipcMain.handle('get-assets-path', async () => {
   
   console.log('✅ Music path sent to renderer:', musicPath);
   return musicPath;
+  } catch (error) {
+    console.error('Error during app ready:', error);
+  }
+
 });
-*/
+
 
 // ✅ GET LOGO PATH
 ipcMain.handle('get-logo-path', async () => {
