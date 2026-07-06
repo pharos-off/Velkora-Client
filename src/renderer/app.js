@@ -440,22 +440,7 @@ class CraftLauncherApp {
         }, 500);
       }
       
-      // ✅ VÉRIFIER LES MISES À JOUR APRÈS LE CHARGEMENT (EN SILENCIEUX)
-      setTimeout(async () => {
-        try {
-          const result = await ipcRenderer.invoke('check-updates');
-          if (result.hasUpdate) {
-            this.ui.showToast({
-              title: 'Mise a jour disponible',
-              message: `La version v${result.latestVersion} est prete. Ouvre les parametres pour l installer.`,
-              type: 'success',
-              duration: 8000
-            });
-          }
-        } catch (error) {
-          // Silent error catch
-        }
-      }, 2000);
+      // Les mises à jour sont gérées automatiquement et silencieusement côté main au démarrage.
       
       // ✅ ÉMETTRE UN ÉVÉNEMENT D'INITIALISATION
       window.dispatchEvent(new CustomEvent('app-ready', { 
@@ -864,9 +849,7 @@ renderMainLayout() {
               <button class="menu-item ${this.currentView === 'stats' ? 'active' : ''}" data-view="stats" disabled style="opacity: 0.5; cursor: not-allowed;">
                 <span class="menu-icon"><i class="bi bi-bar-chart"></i></span> Statistiques
               </button>
-              <button class="menu-item ${this.currentView === 'versions' ? 'active' : ''}" data-view="versions" ${this.currentView === 'versions' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                <span class="menu-icon"><i class="bi bi-search"></i></span> Versions
-              </button>
+              
               <button class="menu-item ${this.currentView === 'mods' ? 'active' : ''}" data-view="mods" ${this.currentView === 'mods' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span class="menu-icon"><i class="bi bi-puzzle"></i></span> Mods
               </button>
@@ -1402,7 +1385,6 @@ renderMainLayout() {
     switch (this.currentView) {
       case 'main': return this.renderHomeView();
       case 'friends': return this.renderFriendsView();
-      case 'versions': return this.renderVersionsView();
       case 'partners': return this.renderPartnersView();
       case 'screenshots': return this.renderScreenshotsView();
       case 'stats': return await this.renderStatsView();
@@ -2537,238 +2519,7 @@ renderMainLayout() {
     `;
   }
 
-  // ✅ PAGE VERSIONS
-  renderVersionsView() {
-    const channelBadge = LauncherVersion.getChannelBadge();
-    const html = `
-      <div class="view-container">
-        <div style="margin-bottom: 40px;">
-          <h1 class="view-title">Versions</h1>
-          <p style="color: #94a3b8; margin-top: 12px; font-size: 15px;">
-            Informations sur le launcher et son état de mise à jour.
-          </p>
-        </div>
 
-        <!-- Carte version actuelle -->
-        <div style="
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.08) 100%);
-          border: 1px solid rgba(99, 102, 241, 0.3);
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 24px;
-        ">
-          <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 20px;">
-            <div>
-              <p style="color: #94a3b8; margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Version du launcher</p>
-              <h2 style="color: #e2e8f0; margin: 0 0 4px 0; font-size: 28px; font-weight: 700;">
-                ${LauncherVersion.getFullVersionWithBuild()}
-              </h2>
-              <p style="color: #64748b; margin: 0; font-size: 13px;">${LauncherVersion.releaseDate} · ${LauncherVersion.channel}</p>
-            </div>
-            <div id="update-status-badge" style="
-              padding: 12px 20px;
-              background: rgba(34, 197, 94, 0.2);
-              border: 1px solid rgba(34, 197, 94, 0.4);
-              border-radius: 8px;
-              color: #4ade80;
-              font-weight: 600;
-              font-size: 13px;
-            ">
-              ✓ À jour
-            </div>
-          </div>
-        </div>
-
-        <!-- Cartes d'actions -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-bottom: 30px;">
-          <div style="
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-              <span style="font-size: 24px;">${icons.download}</span>
-              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Vérifier les mises à jour</h3>
-            </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Cherche une nouvelle version du launcher.</p>
-            <button id="btn-check-updates" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
-              Vérifier maintenant
-            </button>
-          </div>
-
-          <div style="
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-              <span style="font-size: 24px;">${icons.calendar}</span>
-              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Historique des releases</h3>
-            </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Voir les versions publiées du launcher.</p>
-            <button id="btn-view-history" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
-              Voir l'historique
-            </button>
-          </div>
-
-          <div style="
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.15);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s;
-          ">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-              <span style="font-size: 24px;">${icons.newspaper}</span>
-              <h3 style="margin: 0; color: #e2e8f0; font-size: 16px; font-weight: 600;">Changelog</h3>
-            </div>
-            <p style="color: #94a3b8; margin: 0 0 16px 0; font-size: 14px;">Lire les derniers changements du launcher.</p>
-            <button id="btn-read-changelog" class="btn-primary" style="width: 100%; font-size: 13px; padding: 10px;">
-              Lire le changelog
-            </button>
-          </div>
-        </div>
-
-        <!-- Section d'informations détaillées -->
-        <div style="
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%);
-          border: 1px solid rgba(99, 102, 241, 0.2);
-          border-radius: 12px;
-          padding: 24px;
-        ">
-          <h3 style="margin: 0 0 16px 0; color: #6366f1; display: flex; align-items: center; gap: 8px; font-size: 16px;">
-            ℹ️ Informations du launcher
-          </h3>
-
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Nom</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getName()}</p>
-            </div>
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Version</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getVersion()}</p>
-            </div>
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Build</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.getBuild()}</p>
-            </div>
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Date de sortie</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.releaseDate}</p>
-            </div>
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Canal</p>
-              <p style="color: ${channelBadge.color}; margin: 0; font-size: 14px;">${channelBadge.text}</p>
-            </div>
-            <div>
-              <p style="color: #cbd5e1; margin: 0 0 6px 0; font-weight: 600; font-size: 13px;">Auteur</p>
-              <p style="color: #94a3b8; margin: 0; font-size: 14px;">${LauncherVersion.author}</p>
-            </div>
-          </div>
-
-          <div style="margin-top: 24px; padding: 18px; background: rgba(15, 23, 42, 0.65); border-radius: 12px; border: 1px solid rgba(99, 102, 241, 0.15);">
-            <p style="color: #cbd5e1; margin: 0 0 10px 0; font-size: 14px;">Cette page affiche uniquement les informations du launcher.</p>
-            <p style="color: #94a3b8; margin: 0; font-size: 13px;">Les versions Minecraft sont gérées séparément dans la configuration et le lancement du jeu.</p>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Attacher les listeners après rendu
-    setTimeout(() => {
-      const checkBtn = document.getElementById('btn-check-updates');
-      const historyBtn = document.getElementById('btn-view-history');
-      const changelogBtn = document.getElementById('btn-read-changelog');
-
-      // Auto-check updates on render and update the status badge
-      (async () => {
-        try {
-          const badge = document.getElementById('update-status-badge');
-          if (!badge) return;
-          badge.textContent = 'Vérification...';
-          const result = await ipcRenderer.invoke('check-updates').catch(() => null);
-          if (result && result.hasUpdate) {
-            badge.style.background = 'rgba(249,115,22,0.18)';
-            badge.style.borderColor = 'rgba(249,115,22,0.35)';
-            badge.style.color = '#f97316';
-            badge.textContent = `Mise à jour: v${result.latestVersion}`;
-          } else if (result && !result.hasUpdate) {
-            badge.style.background = 'rgba(34,197,94,0.2)';
-            badge.style.borderColor = 'rgba(34,197,94,0.4)';
-            badge.style.color = '#4ade80';
-            badge.textContent = 'À jour';
-          } else {
-            badge.style.background = 'rgba(239,68,68,0.12)';
-            badge.style.borderColor = 'rgba(239,68,68,0.25)';
-            badge.style.color = '#ef4444';
-            badge.textContent = 'Erreur vérif.';
-          }
-        } catch (e) {
-          console.error('Auto check updates error:', e);
-        }
-      })();
-
-      if (checkBtn) {
-        checkBtn.addEventListener('click', async () => {
-          if (checkBtn.disabled) return;
-          const originalText = checkBtn.textContent;
-          checkBtn.disabled = true;
-          checkBtn.textContent = 'Vérification...';
-          try {
-            const result = await ipcRenderer.invoke('check-updates');
-            if (result && result.hasUpdate) {
-              this.ui.showToast({ title: 'Mise à jour disponible', message: `v${result.latestVersion} disponible`, type: 'success', duration: 8000 });
-              const confirmed = await this.ui.showConfirm({
-                title: 'Installer la mise à jour ?',
-                message: `Une mise à jour v${result.latestVersion} est disponible. Voulez-vous la télécharger et l'installer ?`,
-                confirmLabel: 'Installer',
-                cancelLabel: 'Plus tard',
-                type: 'info'
-              });
-              if (confirmed) {
-                const installRes = await ipcRenderer.invoke('install-update');
-                if (installRes && installRes.success) {
-                  this.ui.showToast({ title: 'Installation', message: installRes.message || 'Installation lancée', type: 'success' });
-                } else {
-                  this.ui.showToast({ title: 'Erreur', message: installRes?.error || installRes?.message || 'Impossible d\'installer', type: 'error' });
-                }
-              }
-            } else {
-              const msg = result?.error ? `Aucune mise à jour (${result.error})` : 'Vous êtes à jour';
-              this.ui.showToast({ title: 'Aucun update', message: msg, type: 'info' });
-            }
-          } catch (err) {
-            console.error('Erreur check-updates:', err);
-            this.ui.showToast({ title: 'Erreur', message: err?.message || String(err), type: 'error' });
-          } finally {
-            checkBtn.disabled = false;
-            checkBtn.textContent = originalText;
-          }
-        });
-      }
-
-      if (historyBtn) {
-        historyBtn.addEventListener('click', () => {
-          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/releases');
-          this.ui.showToast({ title: 'Historique', message: 'Ouverture de la page des releases', type: 'info' });
-        });
-      }
-
-      if (changelogBtn) {
-        changelogBtn.addEventListener('click', () => {
-          ipcRenderer.send('open-external', 'https://github.com/pharos-off/Velkora-Client/blob/main/CHANGELOG.md');
-          this.ui.showToast({ title: 'Changelog', message: 'Ouverture du changelog', type: 'info' });
-        });
-      }
-    }, 100);
-
-    return html;
-  }
 
   renderPartnersView() {
     const partners = [

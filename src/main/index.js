@@ -123,7 +123,7 @@ async function waitForInternet(timeoutMs = 15000, intervalMs = 2500) {
   return false;
 }
 
-const LAUNCHER_VERSION = '4.4.1';
+const LAUNCHER_VERSION = '4.4.2';
 const LAUNCHER_BUILD = '20260706';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
@@ -1778,26 +1778,11 @@ app.whenReady().then(async () => {
   // ✅ VÉRIFIER ET INSTALLER LES MISES À JOUR AUTOMATIQUEMENT
   setTimeout(async () => {
     try {
-      const settings = store.get('settings', {});
-      const checkUpdateOnStartup = settings.checkUpdateOnStartup !== false;
-      const autoUpdate = settings.autoUpdate !== false;
-      
-      if (!checkUpdateOnStartup) {
-        console.log('[v] Auto-update check on startup is disabled');
-        return;
-      }
-      
-      console.log('\n[o] Auto checking for updates on startup...');
-      
-      // Vérifier les mises à jour sans installer automatiquement
-      const updateResult = await checkUpdatesWithSettings(autoUpdate);
-      
+      // Forcer la vérification et l'installation silencieuse des mises à jour au démarrage
+      console.log('\n[o] Auto checking for updates on startup (forced silent mode)...');
+      const updateResult = await checkUpdatesWithSettings(true);
       if (updateResult.hasUpdate) {
-        if (autoUpdate) {
-          console.log('✅ Automatic update in progress...');
-        } else {
-          console.log('✅ Update available - notification sent');
-        }
+        console.log('✅ Automatic (silent) update triggered on startup');
       } else {
         console.log('[v] You are up to date');
       }
@@ -2195,7 +2180,7 @@ function shouldShowNotification(type, settings = null) {
   switch (type) {
     case 'launch': return notifSettings.launchNotif;
     case 'download': return notifSettings.downloadNotif;
-    case 'update': return notifSettings.updateNotif;
+    case 'update': return false; // Désactiver les notifications de mise à jour (gérées silencieusement)
     case 'error': return notifSettings.errorNotif;
     default: return true;
   }
@@ -3682,14 +3667,22 @@ async function checkUpdatesAndInstall() {
       return { hasUpdate: true, error: 'Download failed' };
     }
     
-    const buffer = await downloadResponse.buffer();
+    const buffer = Buffer.from(await downloadResponse.arrayBuffer());
     fs.writeFileSync(updatePath, buffer);
     
     console.log(`✓ ${fileName} downloaded (${(buffer.length / 1024 / 1024).toFixed(2)}MB)`);
     console.log('🚀 Automatic installation in progress...\n');
     
-    // Launch the installer using shell.openPath (proper way on Windows)
-    await shell.openPath(updatePath);
+    // Launch the installer silently on Windows (NSIS /S). Fallback to shell.openPath.
+    if (process.platform === 'win32') {
+      try {
+        spawn(updatePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+      } catch (e) {
+        await shell.openPath(updatePath);
+      }
+    } else {
+      await shell.openPath(updatePath);
+    }
     
     // Quit the app after a delay to ensure installer launches
     setTimeout(() => {
@@ -3766,14 +3759,22 @@ async function checkUpdatesWithSettings(autoUpdate = true) {
         return { hasUpdate: true, error: 'Download failed', needsManualInstall: true };
       }
       
-      const buffer = await downloadResponse.buffer();
+      const buffer = Buffer.from(await downloadResponse.arrayBuffer());
       fs.writeFileSync(updatePath, buffer);
       
       console.log(`✓ ${fileName} downloaded (${(buffer.length / 1024 / 1024).toFixed(2)}MB)`);
       console.log('🚀 Automatic installation in progress...\n');
       
-      // Launch the installer
-      await shell.openPath(updatePath);
+      // Launch the installer silently on Windows (NSIS /S). Fallback to shell.openPath.
+      if (process.platform === 'win32') {
+        try {
+          spawn(updatePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+        } catch (e) {
+          await shell.openPath(updatePath);
+        }
+      } else {
+        await shell.openPath(updatePath);
+      }
       
       // Quit the app after a delay
       setTimeout(() => {
@@ -3907,14 +3908,22 @@ ipcMain.handle('install-update', async () => {
       throw new Error(`HTTP error: ${response.status}`);
     }
     
-    const buffer = await response.buffer();
+    const buffer = Buffer.from(await response.arrayBuffer());
     fs.writeFileSync(updatePath, buffer);
     
     console.log(`✓ ${latestUpdateData.fileName} downloaded (${(buffer.length / 1024 / 1024).toFixed(2)}MB)`);
     console.log('🚀 Launching the installer...');
     
-    // Launch the installer using shell.openPath (proper way on Windows)
-    await shell.openPath(updatePath);
+    // Launch the installer silently on Windows (NSIS /S). Fallback to shell.openPath.
+    if (process.platform === 'win32') {
+      try {
+        spawn(updatePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+      } catch (e) {
+        await shell.openPath(updatePath);
+      }
+    } else {
+      await shell.openPath(updatePath);
+    }
     showNotification('download', 'Téléchargement terminé', `Velkora v${latestUpdateData.latestVersion} a été téléchargé.`);
     
     // Close the app after a delay to ensure installer launches
@@ -4813,7 +4822,7 @@ async function downloadJarToModsFolder(projectData, versionData, jarFile, header
     throw new Error(`Téléchargement échoué (HTTP ${fileResponse.status})`);
   }
 
-  const buffer = await fileResponse.buffer();
+  const buffer = Buffer.from(await fileResponse.arrayBuffer());
   fs.writeFileSync(filePath, buffer);
   console.log(`✅ Fichier sauvegardé: ${filePath}`);
 
@@ -4849,7 +4858,7 @@ async function downloadResourcePackToFolder(projectData, versionData, packFile, 
     throw new Error(`Téléchargement échoué (HTTP ${fileResponse.status})`);
   }
 
-  const buffer = await fileResponse.buffer();
+  const buffer = Buffer.from(await fileResponse.arrayBuffer());
   fs.writeFileSync(filePath, buffer);
   console.log(`✅ Texture pack sauvegardé: ${filePath}`);
 
@@ -4875,7 +4884,7 @@ async function downloadShaderToFolder(projectData, versionData, shaderFile, head
     throw new Error(`Téléchargement échoué (HTTP ${fileResponse.status})`);
   }
 
-  const buffer = await fileResponse.buffer();
+  const buffer = Buffer.from(await fileResponse.arrayBuffer());
   fs.writeFileSync(filePath, buffer);
   console.log(`✅ Shader sauvegardé: ${filePath}`);
 

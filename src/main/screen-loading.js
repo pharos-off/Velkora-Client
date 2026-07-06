@@ -19,16 +19,8 @@ class ScreenLoading {
    * ✅ VÉRIFIER ET AFFICHER LES NOTIFICATIONS DE MISE À JOUR
    */
   async checkAndDisplayUpdates() {
-    setTimeout(async () => {
-      try {
-        const result = await ipcRenderer.invoke('check-updates');
-        if (result.hasUpdate) {
-          this.displayUpdateNotification(result.latestVersion);
-        }
-      } catch (error) {
-        console.log('⚠️ Error checking updates:', error);
-      }
-    }, 2000);
+    // Updates checks are handled by the main process silently; renderer should not invoke check-updates.
+    return;
   }
 
   /**

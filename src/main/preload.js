@@ -2,8 +2,8 @@ const { contextBridge, ipcRenderer, shell } = require('electron');
 
 // Whitelists des canaux IPC (adapter si besoin)
 const INVOKE_ALLOWED = [
-  'get-player-head','check-updates','get-auth-data','get-profiles','get-settings','get-system-ram','get-friends','check-friends-status',
-  'subscribe-newsletter','get-logo-path','install-update','get-screenshots-list','get-screenshots-count','get-screenshots-folder',
+  'get-player-head','get-auth-data','get-profiles','get-settings','get-system-ram','get-friends','check-friends-status',
+  'subscribe-newsletter','get-logo-path','get-screenshots-list','get-screenshots-count','get-screenshots-folder',
   'get-saves-folder','get-saves-count','get-resourcepacks-folder','get-installed-resourcepacks','get-installed-mods','create-profile',
   'delete-profile','duplicate-profile','get-game-stats','get-assets-path','select-game-directory','set-startup-enabled','get-startup-enabled',
   'get-storage-info','get-notification-settings','save-notification-settings','test-notification','test-discord-rpc','get-discord-settings',

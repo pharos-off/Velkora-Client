@@ -133,11 +133,7 @@ async function loadSettings() {
       if (ramHelpText) ramHelpText.textContent = `Allocate between 1 and ${systemRam} GB for Minecraft`;
     }
 
-    // ✅ Charger les paramètres de mise à jour
-    const checkUpdateStartupToggle = document.getElementById('check-update-startup-toggle');
-    const autoUpdateToggle = document.getElementById('auto-update-toggle');
-    if (checkUpdateStartupToggle) checkUpdateStartupToggle.checked = settings.checkUpdateOnStartup !== false;
-    if (autoUpdateToggle) autoUpdateToggle.checked = settings.autoUpdate !== false;
+    // Les paramètres de mise à jour sont gérés automatiquement côté main (silencieux)
   } catch (error) {
     console.error('Erreur chargement parametres:', error);
   }
@@ -705,9 +701,7 @@ function renderSettings() {
           <button class="menu-category" data-tab="discord">
             <span class="menu-icon"><i class="bi bi-discord"></i></span><span class="menu-text">Discord</span>
           </button>
-          <button class="menu-category" data-tab="updates">
-            <span class="menu-icon"><i class="bi bi-download"></i></span><span class="menu-text">Mises a jour</span>
-          </button>
+          
           <button class="menu-category" data-tab="about">
             <span class="menu-icon"><i class="bi bi-info-circle"></i></span><span class="menu-text">A propos</span>
           </button>
@@ -880,32 +874,7 @@ function renderSettings() {
             </div>
           </div>
 
-          <div class="settings-card">
-            <h3>Mises à jour du Launcher</h3>
-            <div class="setting-item">
-              <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="check-update-startup-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
-                <span>Vérifier les mises à jour au démarrage</span>
-              </label>
-              <p class="help-text">Vérifie automatiquement les nouvelles versions au lancement</p>
-            </div>
-
-            <div class="setting-item" style="margin-top: 20px;">
-              <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox" id="auto-update-toggle" style="width: 18px; height: 18px; margin-right: 12px; cursor: pointer;">
-                <span>Télécharger et installer automatiquement</span>
-              </label>
-              <p class="help-text">Télécharge et installe les mises à jour sans confirmation</p>
-            </div>
-
-            <div class="setting-item" style="margin-top: 20px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <button id="auto-install-update-btn" class="btn-primary" style="font-size: 13px; padding: 10px;">Mettre à jour (Auto)</button>
-                <button id="manual-check-update-btn" class="btn-primary" style="font-size: 13px; padding: 10px;">Vérifier (Manuel)</button>
-              </div>
-              <p class="help-text" style="margin-top: 15px;">Auto: télécharge et installe immédiatement | Manuel: vérifier et confirmer</p>
-            </div>
-          </div>
+          
 
           <div class="button-group">
             <button id="save-settings-btn" class="btn-primary">Valider et sauvegarder</button>
@@ -1126,64 +1095,7 @@ function renderSettings() {
           </div>
         </div>
 
-        <div class="settings-section" id="updates-tab" style="display: none;">
-          <h2>Mises a jour</h2>
-          <div class="settings-card">
-            <h3>Etat des mises a jour</h3>
-            <div class="setting-item">
-              <label>Version actuelle</label>
-              <p id="current-version" style="color: #d1d5db; padding: 10px 0; font-weight: 500;">Chargement...</p>
-            </div>
-            <div class="setting-item" style="margin-top: 20px;">
-              <label>Derniere version disponible</label>
-              <p id="latest-version" style="color: #d1d5db; padding: 10px 0; font-weight: 500;">Chargement...</p>
-            </div>
-            <div class="setting-item" style="margin-top: 20px;">
-              <label>Statut</label>
-              <p id="update-status" style="color: #10b981; padding: 10px 0; font-weight: 500;">Verifiant les mises a jour...</p>
-            </div>
-
-            <div class="setting-item" style="margin-top: 20px; display: none;" id="changelog-container">
-              <label>Changelog</label>
-              <div style="margin-top: 10px; padding: 12px; background: rgba(99, 102, 241, 0.05); border-radius: 8px; max-height: 250px; overflow-y: auto; border-left: 3px solid #6366f1;">
-                <pre id="release-notes" style="color: #cbd5e1; font-size: 12px; line-height: 1.5; margin: 0; white-space: pre-wrap; word-wrap: break-word; font-family: 'Courier New', monospace;">Chargement...</pre>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <h3>Actions</h3>
-            <div class="setting-item">
-              <button id="check-updates-btn" class="btn-primary" style="width: 100%;">Verifier les mises a jour</button>
-              <p class="help-text" style="margin-top: 15px;">Clique pour chercher de nouvelles versions disponibles</p>
-            </div>
-
-            <div class="setting-item" style="margin-top: 20px;">
-              <button id="install-update-btn" class="btn-primary" style="width: 100%; background: #10b981; display: none;">Installer la mise a jour</button>
-              <p class="help-text" style="margin-top: 15px;">Telecharge et installe la derniere version</p>
-            </div>
-
-            <div class="setting-item" style="margin-top: 20px;">
-              <div id="update-progress-container" style="display: none;">
-                <label>Progression du telechargement</label>
-                <div style="width: 100%; height: 30px; background: rgba(99, 102, 241, 0.1); border-radius: 10px; overflow: hidden; margin-top: 10px;">
-                  <div id="update-progress-bar" style="height: 100%; background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 0%; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 12px;">0%</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <h3>Informations</h3>
-            <p style="color: #d1d5db; line-height: 1.8;">
-              Le launcher verifiera automatiquement les nouvelles versions au demarrage. 
-              Vous pouvez aussi verifier manuellement en cliquant sur le bouton ci-dessus.
-            </p>
-            <p style="color: #94a3b8; line-height: 1.8; margin-top: 15px;">
-              <strong style="color: #6366f1;">Note:</strong> L'application se relancera automatiquement apres l'installation.
-            </p>
-          </div>
-        </div>
+        
 
         <div class="settings-section" id="about-tab" style="display: none;">
           <h2>A propos</h2>
@@ -1663,8 +1575,7 @@ function renderSettings() {
           closeLauncherOnLaunch: !!document.getElementById('close-launcher-toggle')?.checked,
           showLogsWindow: !!document.getElementById('show-logs-toggle')?.checked,
           useProtocolConnect: !!document.getElementById('protocol-connect-toggle')?.checked,
-          checkUpdateOnStartup: !!document.getElementById('check-update-startup-toggle')?.checked,
-          autoUpdate: !!document.getElementById('auto-update-toggle')?.checked
+          // Les options de mise à jour sont gérées automatiquement par le launcher (silencieuses)
         };
 
         if (settings.version) {
@@ -1709,189 +1620,26 @@ function renderSettings() {
     });
   }
 
-  // ✅ UPDATES - CHECK FOR UPDATES
-  const checkUpdatesBtn = document.getElementById('check-updates-btn');
-  if (checkUpdatesBtn) {
-    checkUpdatesBtn.addEventListener('click', async () => {
-      checkUpdatesBtn.disabled = true;
-      const originalText = checkUpdatesBtn.textContent;
-      checkUpdatesBtn.textContent = 'Vérification en cours...';
-      
-      const statusEl = document.getElementById('update-status');
-      const installBtn = document.getElementById('install-update-btn');
-      const versionEl = document.getElementById('latest-version');
-      const currentVersionEl = document.getElementById('current-version');
-      
-      try {
-        const result = await ipcRenderer.invoke('check-updates');
-        
-        const changelogContainer = document.getElementById('changelog-container');
-        const releaseNotesEl = document.getElementById('release-notes');
-        
-        if (result.error) {
-          statusEl.textContent = `Erreur: ${result.error}`;
-          statusEl.style.color = '#ef4444';
-          installBtn.style.display = 'none';
-          if (changelogContainer) changelogContainer.style.display = 'none';
-        } else if (result.hasUpdate) {
-          statusEl.innerHTML = `<span style="color: #10b981;">Mise à jour disponible!</span><br><small style="color: #cbd5e1;">Vous êtes en v${result.currentVersion}, passer à v${result.latestVersion}</small>`;
-          installBtn.style.display = 'block';
-          if (versionEl) versionEl.textContent = `v${result.latestVersion}`;
-          
-          if (changelogContainer && releaseNotesEl) {
-            changelogContainer.style.display = 'block';
-            releaseNotesEl.textContent = result.releaseNotes || 'Aucune note de version disponible';
-          }
-        } else {
-          statusEl.innerHTML = `<span style="color: #10b981;">À jour!</span><br><small style="color: #cbd5e1;">Vous utilisez la dernière version (v${result.currentVersion})</small>`;
-          installBtn.style.display = 'none';
-          if (versionEl) versionEl.textContent = `v${result.latestVersion}`;
-          if (changelogContainer) changelogContainer.style.display = 'none';
-        }
-        
-        if (currentVersionEl) currentVersionEl.textContent = `v${result.currentVersion}`;
-      } catch (error) {
-        console.error('Erreur check-updates:', error);
-        statusEl.textContent = `Erreur: ${error.message}`;
-        statusEl.style.color = '#ef4444';
-        installBtn.style.display = 'none';
-        const changelogContainer = document.getElementById('changelog-container');
-        if (changelogContainer) changelogContainer.style.display = 'none';
-      } finally {
-        checkUpdatesBtn.disabled = false;
-        checkUpdatesBtn.textContent = originalText;
-      }
-    });
-  }
+  // Vérification/installation manuelle désactivée : les mises à jour sont automatiques et silencieuses côté main.
 
   // ✅ UPDATES - INSTALL UPDATE
   const installUpdateBtn = document.getElementById('install-update-btn');
   if (installUpdateBtn) {
-    installUpdateBtn.addEventListener('click', async () => {
-      const confirmed = await ui.showConfirm({
-        title: 'Installer la mise a jour ?',
-        message: 'L application va telecharger la nouvelle version puis redemarrer automatiquement.',
-        confirmLabel: 'Installer',
-        cancelLabel: 'Annuler',
-        type: 'info'
-      });
-      if (confirmed) {
-        installUpdateBtn.disabled = true;
-        const originalText = installUpdateBtn.textContent;
-        installUpdateBtn.textContent = 'Téléchargement et installation...';
-        document.getElementById('update-status').textContent = 'Installation en cours...';
-        document.getElementById('update-status').style.color = '#64748b';
-        
-        try {
-          const result = await ipcRenderer.invoke('install-update');
-          if (result.success) {
-            document.getElementById('update-status').innerHTML = `<span style="color: #10b981;">Installation en cours</span><br><small>L'application va redémarrer...</small>`;
-          } else {
-            throw new Error(result.error);
-          }
-        } catch (error) {
-          console.error('Erreur install-update:', error);
-          document.getElementById('update-status').textContent = `Erreur: ${error.message}`;
-          document.getElementById('update-status').style.color = '#ef4444';
-          installUpdateBtn.disabled = false;
-          installUpdateBtn.textContent = originalText;
-        }
-      }
-    });
+    // Retirer le bouton d'installation manuelle (mise à jour forcée et silencieuse au démarrage)
+    installUpdateBtn.style.display = 'none';
   }
 
   // ✅ MANUAL UPDATE CHECK BUTTON (in settings)
   const manualCheckUpdateBtn = document.getElementById('manual-check-update-btn');
   if (manualCheckUpdateBtn) {
-    manualCheckUpdateBtn.addEventListener('click', async () => {
-      manualCheckUpdateBtn.disabled = true;
-      const originalText = manualCheckUpdateBtn.textContent;
-      manualCheckUpdateBtn.textContent = 'Vérification en cours...';
-      
-      try {
-        const result = await ipcRenderer.invoke('check-updates');
-        
-        if (result.error) {
-          alert(`❌ Erreur: ${result.error}`);
-        } else if (result.hasUpdate) {
-          const confirm = await ui.showConfirm({
-            title: 'Mise à jour disponible',
-            message: `Velkora v${result.latestVersion} est disponible.\nVersion actuelle: v${result.currentVersion}\n\nVoulez-vous installer la mise à jour ?`,
-            confirmLabel: 'Installer',
-            cancelLabel: 'Plus tard',
-            type: 'info'
-          });
-          if (confirm) {
-            try {
-              const installResult = await ipcRenderer.invoke('install-update');
-              if (installResult.success) {
-                console.log('✅ Installation lancée');
-              }
-            } catch (err) {
-              alert(`❌ Erreur installation: ${err.message}`);
-            }
-          }
-        } else {
-          await ui.showDialog({
-            title: '✅ Le launcher est à jour',
-            message: `Vous utilisez déjà la dernière version disponible.\n\nVersion actuelle: v${result.currentVersion}\n\nAucune mise à jour n'est nécessaire.`,
-            type: 'success'
-          });
-        }
-      } catch (error) {
-        console.error('Erreur check-updates:', error);
-        alert(`❌ Erreur: ${error.message}`);
-      } finally {
-        manualCheckUpdateBtn.disabled = false;
-        manualCheckUpdateBtn.textContent = originalText;
-      }
-    });
+    manualCheckUpdateBtn.style.display = 'none';
   }
 
   // ✅ AUTO UPDATE BUTTON (in settings)
   const autoInstallUpdateBtn = document.getElementById('auto-install-update-btn');
   if (autoInstallUpdateBtn) {
-    autoInstallUpdateBtn.addEventListener('click', async () => {
-      autoInstallUpdateBtn.disabled = true;
-      const originalText = autoInstallUpdateBtn.textContent;
-      autoInstallUpdateBtn.textContent = 'Vérification...';
-      
-      try {
-        const result = await ipcRenderer.invoke('check-updates');
-        
-        if (result.error) {
-          alert(`❌ Erreur: ${result.error}`);
-        } else if (result.hasUpdate) {
-          autoInstallUpdateBtn.textContent = 'Téléchargement...';
-          try {
-            const installResult = await ipcRenderer.invoke('install-update');
-            if (installResult.success) {
-              autoInstallUpdateBtn.textContent = 'Installation...';
-              console.log('✅ Installation lancée');
-            } else {
-              alert(`❌ Erreur: ${installResult.error}`);
-            }
-          } catch (err) {
-            alert(`❌ Erreur installation: ${err.message}`);
-            autoInstallUpdateBtn.disabled = false;
-            autoInstallUpdateBtn.textContent = originalText;
-          }
-        } else {
-          await ui.showDialog({
-            title: '✅ Le launcher est à jour',
-            message: `Vous utilisez déjà la dernière version disponible.\n\nVersion actuelle: v${result.currentVersion}\n\nAucune mise à jour n'est nécessaire.`,
-            type: 'success'
-          });
-          autoInstallUpdateBtn.disabled = false;
-          autoInstallUpdateBtn.textContent = originalText;
-        }
-      } catch (error) {
-        console.error('Erreur check-updates:', error);
-        alert(`❌ Erreur: ${error.message}`);
-        autoInstallUpdateBtn.disabled = false;
-        autoInstallUpdateBtn.textContent = originalText;
-      }
-    });
+    // L'auto-update est forcée au démarrage; masquer le contrôle
+    autoInstallUpdateBtn.style.display = 'none';
   }
 
   // ✅ SAVE GAME TAB
@@ -2040,8 +1788,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // 🔔 Signaler au main process que la fenêtre est prête
   ipcRenderer.send('settings-window-ready');
-  
-  setTimeout(() => {
-    document.getElementById('check-updates-btn')?.click();
-  }, 500);
+  // Les vérifications et installations de mise à jour sont forcées et silencieuses au démarrage (côté main).
 });
