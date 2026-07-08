@@ -369,8 +369,7 @@ class DiscordPresence extends EventEmitter {
     }
 
     const { server, players, modpack } = options;
-    const isDiscordRunning = require('ps-list');
-    
+
     let state = this.rpcSettings.showStatus ? `🎮 Version ${version}` : undefined;
     
     if (modpack && this.rpcSettings.showStatus) {

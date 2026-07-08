@@ -123,8 +123,8 @@ async function waitForInternet(timeoutMs = 15000, intervalMs = 2500) {
   return false;
 }
 
-const LAUNCHER_VERSION = '4.4.2';
-const LAUNCHER_BUILD = '20260706';
+const LAUNCHER_VERSION = '4.4.3';
+const LAUNCHER_BUILD = '20260708';
 const LAUNCHER_NAME = 'Velkora Client';
 function getAssetPath(...segments) {
   if (app.isPackaged) {

@@ -2519,8 +2519,6 @@ renderMainLayout() {
     `;
   }
 
-
-
   renderPartnersView() {
     const partners = [
       { 
@@ -5136,9 +5134,30 @@ renderMainLayout() {
 }
 
 const path = require('path');
+const fs = require('fs');
+const { pathToFileURL } = require('url');
 let notificationAudio = null;
-const notificationSoundPath = path.resolve(__dirname, '../../assets/sound-notification.wav');
-const notificationSoundUrl = `file://${notificationSoundPath.replace(/\\/g, '/')}`;
+
+function resolveAssetPath(...segments) {
+  const candidates = [];
+
+  if (process && process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'assets', ...segments));
+  }
+
+  candidates.push(path.resolve(__dirname, '../../assets', ...segments));
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0] || path.resolve(__dirname, '../../assets', ...segments);
+}
+
+const notificationSoundPath = resolveAssetPath('sound-notification.wav');
+const notificationSoundUrl = pathToFileURL(notificationSoundPath).toString();
 
 function playNotificationSound(volume = 0.5) {
   try {

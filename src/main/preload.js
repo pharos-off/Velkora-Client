@@ -6,7 +6,7 @@ const INVOKE_ALLOWED = [
   'subscribe-newsletter','get-logo-path','get-screenshots-list','get-screenshots-count','get-screenshots-folder',
   'get-saves-folder','get-saves-count','get-resourcepacks-folder','get-installed-resourcepacks','get-installed-mods','create-profile',
   'delete-profile','duplicate-profile','get-game-stats','get-assets-path','select-game-directory','set-startup-enabled','get-startup-enabled',
-  'get-storage-info','get-notification-settings','save-notification-settings','test-notification','test-discord-rpc','get-discord-settings',
+  'get-storage-info','get-notification-settings','save-notification-settings','reset-notification-settings','test-notification','test-discord-rpc','get-discord-settings',
   'save-discord-settings','open-minecraft-folder','reset-discord-settings','get-required-java-version','get-detected-java-path',
   'update-profile-version','save-settings','logout-account','ping-server','get-account-info','launch-game','get-mods-folder','launch-minecraft',
   'import-mod','download-modrinth-mod','download-modrinth-resourcepack','get-shaders-folder','get-installed-shaders','download-modrinth-shader',
